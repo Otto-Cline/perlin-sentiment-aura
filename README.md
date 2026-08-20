@@ -118,15 +118,23 @@ value is a getter over a private field, so an assignment throws.
 
 ## The Perlin field
 
-`field()` and `angleAt()` in `frontend/src/aura/field.ts` are the only source of
-noise in the app. Every point on the canvas has a direction; the marker asks
-"which way at my position?" each frame and steps, so its path is a single flow
-line through the field. The usual way to show a flow field is hundreds of thin
-particles — this is one thick pen instead.
+`field()` in `frontend/src/aura/field.ts` is the only source of noise in the app.
+Give it a position, it returns a number — an invisible landscape of hills and
+valleys covering the screen.
 
-The paper is the *same function at eighteen times the zoom*, shaded by finite
-differences and lit from the upper left, so the grain you can see is the field
-itself. One seed, two scales; a second seed would destroy the correlation.
+**The marker reads that landscape as direction.** Each frame it asks "which way
+at my position?" and steps, so its path is a single flow line through the field.
+The usual way to show a flow field is hundreds of thin particles; this is one
+thick pen instead.
+
+**The paper reads the same landscape as height.** For every pixel it compares
+neighbouring values to get the slope, then shades it as if lit from the upper
+left. So the grain you can see *is* the field — you are looking straight at it.
+
+The only difference is scale: the marker samples it at `0.00375` per pixel and
+the paper at `0.0495`, about 13× finer. Same function, same seed, one landscape —
+the pen traces it, the paper lights it up. A second seed would destroy the
+correlation.
 
 The marker also deliberately *resists* the field. Tracking it exactly makes the
 stroke writhe like a ribbon; resisting it is what makes a mark read as deliberate.
