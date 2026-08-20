@@ -49,18 +49,22 @@ export const HIGHLIGHTER = {
   lightness: 62,
 
   /**
-   * A budget, not a taste knob. The nib deposits `speed * thickness` px² per
-   * frame, so persistence and coverage are the same dial viewed twice.
+   * Very slow, by request: marks are meant to stay on the page.
    *
-   * Measured on the demo script, marked page area over time:
-   *   0.0012 — 27% at 10s, 61% at 40s, 88% at 100s: saturates to solid pink.
-   *   0.0030 — ~10% and stable from 40s out past 220s.
+   * Equilibrium coverage is roughly deposit divided by fade, and the nib
+   * deposits `speed * thickness` px² per frame — so a thick nib and a slow fade
+   * cannot both hold the page mostly clear. Measured on the demo script,
+   * stepping frames in real time so arousal actually varies (marked page area):
    *
-   * This is the slowest fade that still reaches an equilibrium instead of
-   * filling the page. Going lower, or adding back a second nib, trades toward
-   * solid pink; sustained maximum arousal pushes that way regardless.
+   *   0.0030 — ~10%, stable from 40s out past 220s.
+   *   0.0010 — 51% at 22s, 72% at 44s; still climbing.
+   *   0.0003 — 63% at 20s; keeps climbing.
+   *
+   * At this value the page becomes largely marked over a few minutes, which is
+   * the intent: a document that gets progressively highlighted. Set 0.003 if a
+   * mostly-clear page that holds indefinitely is wanted instead.
    */
-  fadeRate: 0.003,
+  fadeRate: 0.0003,
 
   /** Frames drawn before first display, so the page is never blank. */
   seedSteps: 140,

@@ -64,6 +64,8 @@ interface Nib {
   x: number;
   y: number;
   heading: number;
+  /** Heading of the previous frame, so the swept quad can be closed exactly. */
+  prevHeading: number;
 }
 
 export interface HighlighterLayer {
@@ -86,17 +88,17 @@ export function createHighlighterLayer(
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("highlighter layer: 2D context unavailable");
 
-  // Square caps and joins: a chisel nib, not a ballpoint.
-  ctx.lineCap = "square";
-  ctx.lineJoin = "round";
-
   let nibs: Nib[] = [];
 
-  const spawn = (): Nib => ({
-    x: rand() * canvas.width,
-    y: rand() * canvas.height,
-    heading: rand() * TAU,
-  });
+  const spawn = (): Nib => {
+    const heading = rand() * TAU;
+    return {
+      x: rand() * canvas.width,
+      y: rand() * canvas.height,
+      heading,
+      prevHeading: heading,
+    };
+  };
 
   const step = (params: HighlighterParams, t: number) => {
     while (nibs.length < HIGHLIGHTER.strokeCount) nibs.push(spawn());
@@ -107,10 +109,11 @@ export function createHighlighterLayer(
     const scale = GESTURE_SCALE * HIGHLIGHTER.gestureScale;
     const turnRate = turnRateFor(params.turnSharpness);
 
-    ctx.strokeStyle = `hsla(${params.hue % 360}, ${params.saturation}%, ${
+    // Filled quads, not stroked lines — see the swept-quad note below.
+    ctx.fillStyle = `hsla(${params.hue % 360}, ${params.saturation}%, ${
       params.lightness
     }%, ${params.alpha})`;
-    ctx.lineWidth = Math.max(1, params.thickness);
+    const halfWidth = Math.max(0.5, params.thickness / 2);
 
     for (const nib of nibs) {
       const fieldHeading = angleAt(nib.x * scale, nib.y * scale, t);
@@ -126,10 +129,29 @@ export function createHighlighterLayer(
       nib.x += Math.cos(nib.heading) * params.speed;
       nib.y += Math.sin(nib.heading) * params.speed;
 
+      // Fill the quad the nib actually swept this frame, using the previous
+      // heading at the back edge and the current one at the front.
+      //
+      // A stroked line cannot do this. Round or square caps extend past the
+      // endpoints and overlap the previous frame's mark, compounding alpha
+      // until a fresh stroke goes dark crimson while faded ones stay pale —
+      // which reads as the colour shifting as it fades. Butt caps stop the
+      // overlap but leave wedge gaps on the outside of every turn, striping the
+      // stroke like corduroy. Tiling the swept area exactly has neither problem.
+      const backNx = -Math.sin(nib.prevHeading) * halfWidth;
+      const backNy = Math.cos(nib.prevHeading) * halfWidth;
+      const frontNx = -Math.sin(nib.heading) * halfWidth;
+      const frontNy = Math.cos(nib.heading) * halfWidth;
+
       ctx.beginPath();
-      ctx.moveTo(fromX, fromY);
-      ctx.lineTo(nib.x, nib.y);
-      ctx.stroke();
+      ctx.moveTo(fromX + backNx, fromY + backNy);
+      ctx.lineTo(nib.x + frontNx, nib.y + frontNy);
+      ctx.lineTo(nib.x - frontNx, nib.y - frontNy);
+      ctx.lineTo(fromX - backNx, fromY - backNy);
+      ctx.closePath();
+      ctx.fill();
+
+      nib.prevHeading = nib.heading;
 
       const margin = params.thickness;
       if (
@@ -163,8 +185,6 @@ export function createHighlighterLayer(
     resize(w: number, h: number) {
       canvas.width = Math.max(1, w);
       canvas.height = Math.max(1, h);
-      ctx.lineCap = "square";
-      ctx.lineJoin = "round";
       nibs = [];
     },
 

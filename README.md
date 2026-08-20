@@ -174,12 +174,35 @@ The nib deliberately *resists* the field. The field's heading spans two full
 turns, so a marker that tracks it closely writhes like a ribbon; resisting it is
 what makes a stroke read as a deliberate mark.
 
+A fading mark changes only its opacity, never its colour. Getting that required
+drawing the marker as **filled swept quads** rather than stroked lines: round or
+square line caps extend past each frame's endpoint and overlap the previous
+mark, compounding alpha until a fresh stroke goes dark crimson while faded ones
+stay pale, which reads as the hue shifting. Butt caps stop the overlap but leave
+wedge gaps on the outside of every turn, striping the stroke like corduroy.
+Filling the exact area the nib swept — previous heading at the back edge,
+current heading at the front — has neither problem. The paper is also kept near
+neutral, since a translucent pink fading toward a cream background mixes toward
+that warmth.
+
 Fade rate is a budget, not a preference — the nib deposits `speed × thickness`
 px² per frame, so persistence and coverage are the same dial seen twice.
-Measured on the demo script: at `0.0012` the marked area runs 27% at 10s, 61% at
-40s and 88% at 100s, saturating to solid pink; at `0.003` it settles near 10%
-and holds there past 220s. The shipped value is the slowest fade that reaches an
-equilibrium rather than filling the page.
+Measured on the demo script, marked page area:
+
+| fadeRate | behaviour |
+|---|---|
+| `0.003` | ~10%, stable from 40s out past 220s |
+| `0.001` | 51% at 22s, 72% at 44s — still climbing |
+| `0.0003` (shipped) | 63% at 20s, keeps climbing |
+
+The shipped value is deliberately slow: the page becomes largely marked over a
+few minutes, which is the point — a document that gets progressively
+highlighted. Set `0.003` for a mostly-clear page that holds indefinitely.
+
+These figures come from stepping frames while wall-clock time advances. An
+earlier set was measured by driving frames synchronously, which froze the demo's
+`setInterval` and pinned arousal at a single value — leaving the nib at maximum
+width and speed throughout and overstating coverage.
 
 Two consequences worth pointing out in a demo. Because every parameter eases
 toward its target at a fixed fraction per frame, the trails record recent

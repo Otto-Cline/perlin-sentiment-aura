@@ -48,9 +48,14 @@ export interface PaperParams {
   temperature: number;
 }
 
-/** Cool grey and warm cream. Low saturation: the ink owns the hue. */
+/**
+ * Cool grey and warm off-white. Very low saturation, and deliberately less
+ * cream than it first was: a translucent pink fading toward a warm background
+ * mixes toward that warmth, which reads as the marker's hue shifting as it
+ * fades. Keeping the paper near neutral keeps a fading mark the same pink.
+ */
 const COOL = { r: 233, g: 234, b: 233 };
-const WARM = { r: 244, g: 240, b: 229 };
+const WARM = { r: 243, g: 240, b: 233 };
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
