@@ -4,7 +4,7 @@ A live speech Perlin field visualization in which your words animate a highlight
 As you speak, the highlighter draws lines on a paper corresponding to sentiment. Over time, the paper
 will crinkle if the highlighter is used heavy-handedly (corresponding to a more urgent sentiment).
 
-[![Watch the demo](https://youtu.be/PJVE0zh8Gzs)]
+https://youtu.be/PJVE0zh8Gzs
 
 **Two modes**, chosen bottom-left. **Live mic** is the real thing. **Demo** plays
 a scripted six-line conversation with no microphone and no network.
