@@ -5,9 +5,17 @@ import { useAnalysis } from "./state/useAnalysis";
 import { useTranscription } from "./state/useTranscription";
 import { createDemoDriver } from "./demo/driver";
 import { Aura } from "./aura/Aura";
+import { InkAura } from "./aura/InkAura";
+import { PaperWear } from "./aura/wear";
 import { KeywordsDisplay } from "./ui/KeywordsDisplay";
+import { RendererSwitch } from "./ui/RendererSwitch";
 import { useKeywordCloud } from "./state/useKeywordCloud";
-import type { Analysis, ConnectionState, SourceMode } from "./types";
+import type {
+  Analysis,
+  ConnectionState,
+  RendererMode,
+  SourceMode,
+} from "./types";
 import "./styles.css";
 
 const SAMPLE = "I think this is going to work really well";
@@ -21,12 +29,24 @@ const PLACEHOLDER: Record<SourceMode, string> = {
 
 export default function App() {
   const [source, setSource] = useState<SourceMode>("demo");
+  const [renderer, setRenderer] = useState<RendererMode>("ink");
   const [recording, setRecording] = useState(false);
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [lines, setLines] = useState<string[]>([]);
   const [interim, setInterim] = useState("");
   const { analysis, analysisRef, submit, apply, lastError } = useAnalysis();
   const keywords = useKeywordCloud(analysis.keywords);
+
+  // Wear is cumulative across the whole session and survives a renderer switch,
+  // so it lives here rather than inside a renderer.
+  const wearRef = useRef(new PaperWear());
+
+  // Once per analysis update — never per frame. At 60fps a per-frame call
+  // saturates the crinkle in under three seconds and the session-long reading
+  // of the paper stops meaning anything.
+  useEffect(() => {
+    wearRef.current.add(analysis.arousal);
+  }, [analysis]);
 
   const onDemoUpdate = useCallback(
     (next: Analysis, line: string) => {
@@ -103,7 +123,15 @@ export default function App() {
 
   return (
     <div className="app">
-      <Aura analysisRef={analysisRef} connection={connection} />
+      {renderer === "ink" ? (
+        <InkAura
+          analysisRef={analysisRef}
+          connection={connection}
+          wearRef={wearRef}
+        />
+      ) : (
+        <Aura analysisRef={analysisRef} connection={connection} />
+      )}
       <TranscriptDisplay
         lines={lines}
         interim={interim}
@@ -119,6 +147,10 @@ export default function App() {
         onToggle={toggle}
         onSourceChange={changeSource}
       />
+      <div className="renderer-pick">
+        <span className="label">Style</span>
+        <RendererSwitch renderer={renderer} onChange={setRenderer} />
+      </div>
     </div>
   );
 }

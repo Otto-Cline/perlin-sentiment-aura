@@ -47,8 +47,18 @@ body {
 .keywords,
 .controls,
 .rationale,
-.error {
+.error,
+.renderer-pick {
   z-index: 1;
+}
+
+.renderer-pick {
+  position: absolute;
+  right: var(--edge);
+  top: var(--edge);
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /* Available to assistive tech, out of the visual flow — and, because it is
@@ -159,10 +169,11 @@ body {
   animation: settle 400ms ease-out both;
 }
 
+/* Sits below the style switch, which also occupies the top-right corner. */
 .error {
   position: absolute;
   right: var(--edge);
-  top: var(--edge);
+  top: calc(var(--edge) + 44px);
   margin: 0;
   font-family: var(--font-instrument);
   font-size: 12px;
