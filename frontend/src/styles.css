@@ -1,0 +1,73 @@
+:root {
+  --ink: rgba(255, 255, 255, 0.92);
+  --panel: rgba(10, 12, 20, 0.42);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #05070c;
+  color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+.app { position: relative; height: 100vh; }
+
+.transcript,
+.debug,
+.controls {
+  position: absolute;
+  backdrop-filter: blur(12px);
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+
+.transcript { left: 32px; bottom: 104px; width: min(46ch, 40vw); }
+.transcript .final { margin: 0 0 6px; }
+.transcript .interim { margin: 0; opacity: 0.45; font-style: italic; }
+
+.debug { right: 32px; top: 32px; font-size: 12px; opacity: 0.7; }
+
+.controls {
+  left: 32px;
+  bottom: 32px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.controls button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-weight: 600;
+  color: #05070c;
+  background: var(--ink);
+  cursor: pointer;
+}
+
+.status { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+
+.status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-live { color: #6ee7a8; }
+.status-live .dot { animation: pulse 1.6s ease-in-out infinite; }
+.status-connecting, .status-reconnecting { color: #f0c674; }
+.status-error { color: #f08c8c; }
+.status-idle { color: rgba(255, 255, 255, 0.4); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.error { position: absolute; right: 32px; bottom: 32px; color: #f08c8c; }
