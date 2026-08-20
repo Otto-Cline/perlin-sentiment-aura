@@ -28,6 +28,17 @@ const MAX_TILT = 0.055;
 export const WRITE_MS = 620;
 
 /**
+ * Gap between successive words of the same batch starting to write.
+ *
+ * The brief is explicit that keywords must "fade in gracefully one by one, not
+ * just pop in". An utterance usually returns three or four keywords at once, so
+ * without this offset they would all appear together — which is exactly the
+ * "pop" the brief rules out. A word whose start time is still in the future has
+ * zero write progress, so it simply waits its turn.
+ */
+export const KEYWORD_STAGGER_MS = 260;
+
+/**
  * Handwriting from the system stack rather than a webfont: a demo runs on
  * unknown networks and a font that fails to load is a visible failure. Leads
  * with macOS handwriting faces, so it degrades to a generic cursive elsewhere.
@@ -181,6 +192,9 @@ export function mergePlaced(
   rand: () => number = Math.random,
 ): PlacedKeyword[] {
   let next = [...existing];
+  // Counts only genuinely new words, so a repeat in the batch does not leave a
+  // gap in the sequence.
+  let arrival = 0;
 
   for (const keyword of incoming) {
     const priorIndex = next.findIndex((p) => p.text === keyword.text);
@@ -194,7 +208,18 @@ export function mergePlaced(
       };
       continue;
     }
-    next.push(placeKeyword(next, keyword, width, height, now, reserved, rand));
+    next.push(
+      placeKeyword(
+        next,
+        keyword,
+        width,
+        height,
+        now + arrival * KEYWORD_STAGGER_MS,
+        reserved,
+        rand,
+      ),
+    );
+    arrival += 1;
   }
 
   if (next.length > HIGHLIGHTER.maxKeywords) {

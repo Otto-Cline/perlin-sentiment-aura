@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  KEYWORD_STAGGER_MS,
   WRITE_MS,
   halfExtents,
   mergePlaced,
@@ -185,6 +186,48 @@ describe("mergePlaced", () => {
     const first = mergePlaced([], [{ text: "a", weight: 0.5 }], W, H, 0);
     mergePlaced(first, [{ text: "b", weight: 0.5 }], W, H, 1);
     expect(first).toHaveLength(1);
+  });
+});
+
+describe("one-by-one arrival", () => {
+  const batch = [
+    { text: "payment", weight: 0.9 },
+    { text: "service", weight: 0.7 },
+    { text: "fell", weight: 0.8 },
+  ];
+
+  it("staggers a batch so words do not all appear at once", () => {
+    // The brief: keywords must fade in "one by one, not just pop in".
+    const placed = mergePlaced([], batch, W, H, 1000);
+    const starts = placed.map((p) => p.bornAt);
+    expect(new Set(starts).size).toBe(batch.length);
+    for (let i = 1; i < starts.length; i++) {
+      expect(starts[i] - starts[i - 1]).toBe(KEYWORD_STAGGER_MS);
+    }
+  });
+
+  it("leaves later words unwritten while the first is still going", () => {
+    const placed = mergePlaced([], batch, W, H, 0);
+    const midFirstWord = WRITE_MS / 2;
+    expect(writeProgress(placed[0].bornAt, midFirstWord)).toBeGreaterThan(0);
+    expect(writeProgress(placed[2].bornAt, midFirstWord)).toBe(0);
+  });
+
+  it("finishes the whole batch eventually", () => {
+    const placed = mergePlaced([], batch, W, H, 0);
+    const wellAfter = WRITE_MS + KEYWORD_STAGGER_MS * batch.length + 1000;
+    for (const p of placed) {
+      expect(writeProgress(p.bornAt, wellAfter)).toBe(1);
+    }
+  });
+
+  it("does not leave a gap in the sequence when a word repeats", () => {
+    const first = mergePlaced([], [{ text: "payment", weight: 0.5 }], W, H, 0);
+    const second = mergePlaced(first, batch, W, H, 5000);
+    // "payment" already exists, so the two new words take arrivals 0 and 1.
+    const fresh = second.filter((p) => p.text !== "payment");
+    expect(fresh[1].bornAt - fresh[0].bornAt).toBe(KEYWORD_STAGGER_MS);
+    expect(fresh[0].bornAt).toBe(5000);
   });
 });
 
