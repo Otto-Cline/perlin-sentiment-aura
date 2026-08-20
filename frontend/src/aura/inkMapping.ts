@@ -57,18 +57,23 @@ export function mapInk(
   const certainty = clamp01(a.speaker_certainty);
   const confidence = clamp01(a.model_confidence);
 
+  // Every range below is deliberately wide. Narrower ranges were technically
+  // correct but read as one continuous texture in motion — the mapping has to
+  // be obvious at a glance while the transcript is also moving.
   return {
     hue: lerp(INK_PRESET.hueCold, INK_PRESET.hueWarm, warmth),
-    saturation: lerp(10, 82, confidence) * damping.saturation,
+    saturation: lerp(14, 95, confidence) * damping.saturation,
     lightness: INK_PRESET.lightness,
 
-    // Confidence thins the ink and lifts the pen more often.
-    opacity: INK_PRESET.opacity * lerp(0.28, 1, confidence),
-    penLift: INK_PRESET.penLift + (1 - confidence) * 0.002,
+    // Confidence thins the ink and lifts the pen far more often — an unsure
+    // read leaves a broken, pale line.
+    opacity: INK_PRESET.opacity * lerp(0.1, 1, confidence),
+    penLift: INK_PRESET.penLift + (1 - confidence) * 0.018,
 
-    // Arousal is travel speed and an unsteadier hand.
-    speed: lerp(0.5, 4, arousal) * damping.speed,
-    jitter: lerp(0.12, 0.75, arousal),
+    // Arousal is travel speed and an unsteadier hand. The top of the speed
+    // range also runs the stroke thin, so fast and calm look different twice.
+    speed: lerp(0.35, 7, arousal) * damping.speed,
+    jitter: lerp(0.04, 1.5, arousal),
 
     // Certainty is commitment: high draws one clean line, low re-sketches.
     commitment: certainty,

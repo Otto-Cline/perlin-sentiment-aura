@@ -105,6 +105,30 @@ scoring one utterance at a time makes the values thrash on filler words.
 
 ## Why this sentiment → visual mapping
 
+### Two visualization styles
+
+The switch at top right chooses between them. Both read the same analysis
+stream and share one noise field.
+
+- **Ink** (default) — three pens trace the field and leave a near-permanent
+  drawing on shaded paper. The ink shows the present moment; the paper shows the
+  whole session.
+- **Streams** — the earlier renderer: hundreds of particles as flowing
+  streamlines.
+
+`field()` and `angleAt()` in `aura/field.ts` are the single source of noise.
+Paper grain and pen gesture call the *same function with the same seed* at
+different input multipliers — grain at ~18× the gesture scale — so the paper
+bulges where the pen curves. That correlation is deliberate; a second seed would
+destroy it.
+
+**Paper wear is cumulative and never resets.** Each analysis update adds
+`arousal * 0.01` to a monotonic accumulator that drives crinkle depth. A calm
+conversation stays smooth; a long intense one leaves a permanently worn surface
+that stays worn after things settle. Only an explicit reset lowers it — the
+value is a getter over a private field, so an assignment throws rather than
+silently succeeding.
+
 ### Visual direction
 
 The field is a pen plotter tracing a vector field, so the whole interface is
@@ -126,6 +150,20 @@ errors, and nothing else competes.
 
 The through-line: four independent signals drive four independent visual
 channels, so a viewer reads them simultaneously without the channels colliding.
+
+In the **ink** style the same four signals drive the pen instead of the field:
+
+| Signal | Ink parameter | Reasoning |
+|---|---|---|
+| valence | ink hue, blue pen → sienna | Measured swing is deliberate and large: negative valence renders around RGB (87, 142, 169), positive around (176, 152, 73). A subtler ramp was technically correct and unreadable in motion. |
+| arousal | travel speed and hand steadiness | Fast strokes also run *thin* while slow ones pool, so arousal is legible twice over — in motion and in line weight. |
+| speaker_certainty | stroke commitment | Above ~0.7 the pen draws one clean line. Below that it re-sketches the same path with random offsets, up to six overlapping passes at zero — the visual of someone drafting and re-drafting. |
+| model_confidence | opacity, saturation, pen lifts | An unsure read leaves a pale, broken line. Confident ink is solid and continuous. |
+| cumulative arousal | paper crinkle depth | The only channel that records history rather than the present. |
+
+Ink is set on a curve rather than linearly where it matters: valence is eased
+before crossing the hue ramp, and commitment is curved so hesitation ramps
+steeply instead of creeping in.
 
 Two consequences worth pointing out in a demo. Because every parameter eases
 toward its target at a fixed fraction per frame, the trails record recent
@@ -213,9 +251,17 @@ and key-leak cases.
 cd frontend && npm test
 ```
 
-33 tests: the sequence-number staleness gate, the sentiment→visual mapping at
-its boundaries, keyword merge and TTL expiry, the demo driver's output ranges,
-and the `speech_final`-not-`is_final` submit rule with backoff growth.
+93 tests: the sequence-number staleness gate, both sentiment→visual mappings at
+their boundaries, the noise field's range, continuity and paper-vs-pen scale
+separation, the monotonic wear invariant, stroke commitment and width curves,
+paper re-render throttling, keyword merge and TTL expiry, transcript line
+identity across the sliding window, the demo driver's output ranges, and the
+`speech_final`-not-`is_final` submit rule with backoff growth.
+
+There is also a standalone tuning page at `/tune.html` in dev, with sliders for
+every paper and ink parameter. It imports the same modules the app uses, so
+values dialled in there transfer directly. It is not part of the production
+build.
 
 The visualization itself is verified by eye — and, in automated checks, by
 driving frames through p5's `redraw()` and measuring canvas luminance and

@@ -23,14 +23,21 @@ export const INK_PRESET = {
   strokeCount: 3,
   lifetime: 770,
   opacity: 0.85,
-  lightness: 12,
 
   /**
-   * Zero: strokes accumulate permanently, so the canvas reads as a drawing
-   * rather than a live simulation. With only 3 pens this builds slowly, but a
-   * long enough session will eventually silt up — raise to ~0.0005 if it does.
+   * Blue ink, not black. At 12 every hue collapsed into RGB 60-80 and the
+   * valence channel was unreadable; at 30 the cold end reads as a real blue
+   * pen and the warm end as sienna.
    */
-  fadeRate: 0,
+  lightness: 30,
+
+  /**
+   * Small but non-zero. Zero made the canvas show hue *history* rather than the
+   * present — old amber strokes never left, so the average sat mid-ramp no
+   * matter what was being said. This still reads as an accumulating drawing
+   * over minutes while letting old hues recede.
+   */
+  fadeRate: 0.0004,
 
   /** Pen never lifts at the tuned setting. */
   penLift: 0,

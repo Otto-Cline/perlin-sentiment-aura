@@ -21,6 +21,15 @@ describe("resketchPasses", () => {
     expect(resketchPasses(0.5)).toBeGreaterThan(1);
   });
 
+  it("reaches a visible scribble at zero certainty", () => {
+    // The channel has to be obvious in motion, not a subtle doubling.
+    expect(resketchPasses(0)).toBeGreaterThanOrEqual(5);
+  });
+
+  it("separates assured from hedging by more than one pass", () => {
+    expect(resketchPasses(0.15) - resketchPasses(0.85)).toBeGreaterThanOrEqual(3);
+  });
+
   it("never increases with commitment", () => {
     let previous = Infinity;
     for (let c = 0; c <= 1.0001; c += 0.05) {

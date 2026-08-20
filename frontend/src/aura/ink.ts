@@ -35,13 +35,24 @@ export interface InkParams {
 }
 
 /** Extra passes at zero commitment. Each is one re-sketch of the same path. */
-const MAX_RESKETCH_PASSES = 3;
-/** How far a re-sketch pass strays, in pixels. */
-const RESKETCH_OFFSET = 2.2;
+const MAX_RESKETCH_PASSES = 5;
+
+/**
+ * Shapes how fast hesitation sets in. Above 1 keeps a confident speaker on a
+ * single clean line and then ramps hard, so the difference between assured and
+ * hedging is obvious rather than gradual.
+ */
+const RESKETCH_CURVE = 1.6;
+
+/** How far a re-sketch pass strays, in pixels. Wide enough to read as scribble. */
+const RESKETCH_OFFSET = 4.5;
 
 /** Slow pens pool like real ink; fast ones run thin. */
-const WIDTH_AT_REST = 2.6;
-const WIDTH_AT_SPEED = 0.55;
+const WIDTH_AT_REST = 5;
+const WIDTH_AT_SPEED = 0.45;
+
+/** Top of the mapped speed range, for normalizing stroke width. */
+const SPEED_CEILING = 7;
 
 interface Pen {
   x: number;
@@ -75,9 +86,10 @@ export function resketchPasses(commitment: number): number {
   // committed — one clean line.
   if (!Number.isFinite(commitment)) return 1;
   const clamped = Math.min(1, Math.max(0, commitment));
-  // floor, not round: rounding starts doubling the line at 0.8 certainty, which
-  // is still a confident speaker. This keeps one clean line down to ~0.67.
-  return 1 + Math.floor((1 - clamped) * MAX_RESKETCH_PASSES);
+  // Curved and floored: a confident speaker holds one clean line down to ~0.72,
+  // then hesitation ramps steeply to a visible scribble at zero.
+  const hesitation = (1 - clamped) ** RESKETCH_CURVE;
+  return 1 + Math.floor(hesitation * MAX_RESKETCH_PASSES);
 }
 
 export function createInkLayer(width: number, height: number): InkLayer {
@@ -116,7 +128,10 @@ export function createInkLayer(width: number, height: number): InkLayer {
 
     const scale = GESTURE_SCALE * params.gestureScale;
     const passes = resketchPasses(params.commitment);
-    const alpha = params.opacity / passes; // keep re-sketches from over-inking
+    // sqrt, not linear: dividing by the pass count made a hesitant stroke fade
+    // out rather than look scribbled. This keeps overall density roughly steady
+    // while the overlapping passes stay individually visible.
+    const alpha = params.opacity / Math.sqrt(passes);
 
     ctx.strokeStyle =
       `hsla(${params.hue}, ${params.saturation}%, ${params.lightness}%, ${alpha})`;
@@ -135,7 +150,7 @@ export function createInkLayer(width: number, height: number): InkLayer {
       pen.y += Math.sin(angle) * params.speed;
 
       if (pen.down) {
-        ctx.lineWidth = strokeWidthFor(params.speed, 4.5);
+        ctx.lineWidth = strokeWidthFor(params.speed, SPEED_CEILING);
         for (let pass = 0; pass < passes; pass++) {
           // Pass 0 is the true path; the rest are the hesitant re-draws.
           const jx = pass === 0 ? 0 : (Math.random() * 2 - 1) * RESKETCH_OFFSET;
