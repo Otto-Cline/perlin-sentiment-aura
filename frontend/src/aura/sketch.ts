@@ -3,11 +3,20 @@ import type { VisualTargets } from "./mapping";
 
 const PARTICLE_COUNT = 850;
 const SMOOTHING = 0.04;
-const BG_HUE = 225;
-// Per-frame wipe, out of 255. Sets how long trails persist: lower means longer
-// streaks and more accumulation. Balanced against `alpha` in mapping.ts.
+
+// Warm off-white plotter paper, in the sketch's HSB(360, 100, 100) space.
+const PAPER_HUE = 45;
+const PAPER_SAT = 4;
+const PAPER_BRIGHT = 96;
+
+// Ink is dark, so strokes darken the paper as they overlap rather than glowing.
+// Held well below paper brightness; saturation is what carries the hue.
+const INK_BRIGHTNESS = 36;
+
+// Per-frame wash of paper over the plot, out of 255. Sets how long trails
+// persist: lower means longer streaks. Balanced against `alpha` in mapping.ts.
 const TRAIL_FADE = 7;
-const STROKE_WEIGHT = 1.2;
+const STROKE_WEIGHT = 1.1;
 
 const START: VisualTargets = {
   hue: 212,
@@ -42,7 +51,7 @@ export function createSketch(getTargets: () => VisualTargets) {
       p.createCanvas(p.windowWidth, p.windowHeight);
       p.pixelDensity(1);
       p.colorMode(p.HSB, 360, 100, 100, 255);
-      p.background(BG_HUE, 34, 5);
+      p.background(PAPER_HUE, PAPER_SAT, PAPER_BRIGHT);
       for (let i = 0; i < PARTICLE_COUNT; i++) scatter(i);
     };
 
@@ -54,10 +63,10 @@ export function createSketch(getTargets: () => VisualTargets) {
 
       // Low-alpha wash instead of a hard clear: this is what leaves trails.
       p.noStroke();
-      p.fill(BG_HUE, 34, 5, TRAIL_FADE);
+      p.fill(PAPER_HUE, PAPER_SAT, PAPER_BRIGHT, TRAIL_FADE);
       p.rect(0, 0, p.width, p.height);
 
-      p.stroke(cur.hue, cur.saturation, 96, cur.alpha);
+      p.stroke(cur.hue, cur.saturation, INK_BRIGHTNESS, cur.alpha);
       p.strokeWeight(STROKE_WEIGHT);
 
       const scale = 0.0015 + cur.turbulence * 0.0021;
@@ -90,7 +99,7 @@ export function createSketch(getTargets: () => VisualTargets) {
 
     p.windowResized = () => {
       p.resizeCanvas(p.windowWidth, p.windowHeight);
-      p.background(BG_HUE, 34, 5);
+      p.background(PAPER_HUE, PAPER_SAT, PAPER_BRIGHT);
       for (let i = 0; i < PARTICLE_COUNT; i++) scatter(i);
     };
   };

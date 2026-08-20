@@ -57,11 +57,13 @@ export function mapAnalysis(a: Analysis, conn: ConnectionState): VisualTargets {
   return {
     hue: lerp(HUE_NEGATIVE, HUE_POSITIVE, warmth),
 
-    // Low model confidence literally looks washed out.
-    saturation: lerp(16, 84, confidence) * damping.sat,
-    // Tuned against TRAIL_FADE in sketch.ts: too low and the wipe erases each
-    // stroke before neighbouring passes can accumulate into a visible stream.
-    alpha: lerp(34, 132, confidence),
+    // Low model confidence literally looks washed out — on paper that reads as
+    // grey graphite rather than coloured ink.
+    saturation: lerp(8, 92, confidence) * damping.sat,
+    // Tuned against TRAIL_FADE in sketch.ts: too low and the wash erases each
+    // stroke before neighbouring passes accumulate into a visible stream; too
+    // high and 850 dark strokes muddy the paper.
+    alpha: lerp(26, 125, confidence),
 
     // Arousal is energy: faster particles, faster field evolution, more churn.
     // The floor stays high enough that segments are lines rather than dots.

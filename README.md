@@ -48,8 +48,8 @@ feed the identical downstream pipeline.
 
 | Mode | Transcript | Analysis | Needs |
 |---|---|---|---|
-| **Demo mode** | scripted six-line arc | scripted, on a 3.2s timer | nothing — no mic, no network |
-| **Backend** | one fixed sample line | real `/process_text` → Claude | Anthropic key |
+| **Demo** | scripted six-line arc | scripted, on a 3.2s timer | nothing — no mic, no network |
+| **Sample** | one fixed sample line | real `/process_text` → Claude | Anthropic key |
 | **Live mic** | real Deepgram stream | real `/process_text` → Claude | both keys |
 
 Demo mode is the fallback if the mic or the network fails during a live demo,
@@ -105,12 +105,23 @@ scoring one utterance at a time makes the values thrash on filler words.
 
 ## Why this sentiment → visual mapping
 
+### Visual direction
+
+The field is a pen plotter tracing a vector field, so the whole interface is
+built as instrument-on-paper: dark ink on warm off-white stock, strokes
+darkening the paper as they overlap rather than glowing. Two typefaces, both
+from system stacks so there is no webfont that can fail mid-demo — a serif for
+transcript text, because that is speech being typeset, and a monospace for
+instrument chrome (labels, controls, status). The only saturated colour in the
+interface is the ink hue itself; one oxblood is reserved for recording and
+errors, and nothing else competes.
+
 | Signal | Visual parameter | Reasoning |
 |---|---|---|
-| valence | hue (cold blue → warm gold) | Warmth reads as pleasantness pre-verbally, so the most legible channel carries the primary emotional axis. Valence is eased (exponent 0.55) before crossing the hue range: a linear map spends its whole middle in green, which is where ordinary speech sits, so the aura would look green nearly always and true blue would appear only at valence -1. Eased, green is confined to roughly \|valence\| < 0.15. |
+| valence | ink hue (slate blue → bronze) | Warmth reads as pleasantness pre-verbally, so the most legible channel carries the primary emotional axis. At ink brightness a cold hue reads as slate blue and a warm one as bronze — gold ink does not exist, ochre does. Valence is eased (exponent 0.55) before crossing the hue range: a linear map spends its whole middle in green, which is where ordinary speech sits, so the field would look green nearly always and true blue would appear only at valence -1. Eased, green is confined to roughly \|valence\| < 0.15. |
 | arousal | particle speed, noise time-step, field turbulence | Energy in the data becomes energy in the motion. Immediately readable without a legend. |
 | speaker_certainty | field coherence — high aligns particles into laminar streams, low makes the noise octaves disagree and fragments the flow into eddies | Form mirrors conviction: a decisive speaker produces order, a hedging one produces turbulence. |
-| model_confidence | saturation and opacity | Low confidence *literally looks washed out*. The visualization is honest about its own uncertainty instead of asserting a confident neutral. |
+| model_confidence | saturation and opacity | Low confidence *literally looks washed out* — on paper it reads as grey graphite rather than coloured ink. The visualization is honest about its own uncertainty instead of asserting a confident neutral. |
 | keyword weight | font size and lifetime | Important words are bigger and linger longer. |
 
 The through-line: four independent signals drive four independent visual
@@ -183,6 +194,9 @@ justified by the error-handling rubric line and by being the live-demo fallback.
 - **No component-level React tests.** The state coordination between
   `useTranscription` and `App` was verified in a browser rather than with a
   testing library. Pure logic is unit-tested; rendering is not.
+- **Reduced motion is implemented but not exercised.** `prefers-reduced-motion`
+  zeroes the word, keyword and pill animations. The rule is in place; no
+  environment was available to assert it with the preference actually set.
 
 ## Tests
 

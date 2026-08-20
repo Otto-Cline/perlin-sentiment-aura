@@ -12,6 +12,13 @@ import "./styles.css";
 
 const SAMPLE = "I think this is going to work really well";
 
+// An empty panel is an invitation to act, so it says what to do next.
+const PLACEHOLDER: Record<SourceMode, string> = {
+  demo: "Press Start to play the scripted demo.",
+  hardcoded: "Press Start to score one sample line.",
+  live: "Press Start, allow the microphone, then speak.",
+};
+
 export default function App() {
   const [source, setSource] = useState<SourceMode>("demo");
   const [recording, setRecording] = useState(false);
@@ -97,7 +104,11 @@ export default function App() {
   return (
     <div className="app">
       <Aura analysisRef={analysisRef} connection={connection} />
-      <TranscriptDisplay lines={lines} interim={interim} />
+      <TranscriptDisplay
+        lines={lines}
+        interim={interim}
+        placeholder={PLACEHOLDER[source]}
+      />
       <KeywordsDisplay keywords={keywords} />
       {analysis.rationale && <p className="rationale">{analysis.rationale}</p>}
       {lastError && <p className="error">{lastError}</p>}

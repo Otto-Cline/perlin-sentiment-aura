@@ -1,3 +1,4 @@
+import { SourceSwitch } from "./SourceSwitch";
 import type { ConnectionState, SourceMode } from "../types";
 
 interface Props {
@@ -32,15 +33,7 @@ export function Controls({
         <span className="dot" aria-hidden="true" />
         {LABELS[connection]}
       </span>
-      <select
-        value={source}
-        onChange={(e) => onSourceChange(e.target.value as SourceMode)}
-        aria-label="Analysis source"
-      >
-        <option value="demo">Demo mode</option>
-        <option value="hardcoded">Backend (hardcoded)</option>
-        <option value="live">Live mic</option>
-      </select>
+      <SourceSwitch source={source} onChange={onSourceChange} />
     </div>
   );
 }
