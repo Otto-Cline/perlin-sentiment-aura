@@ -30,6 +30,37 @@ describe("mapAnalysis", () => {
     );
   });
 
+  it("pushes moderate valence out of the green midband", () => {
+    // A linear map would leave ordinary speech sitting in green. Moderate
+    // valence must land nearer its own extreme than linear interpolation would.
+    const linearAt = (v: number) =>
+      HUE_NEGATIVE + (HUE_POSITIVE - HUE_NEGATIVE) * ((v + 1) / 2);
+
+    const negative = mapAnalysis({ ...base, valence: -0.3 }, "live").hue;
+    expect(negative).toBeGreaterThan(linearAt(-0.3));
+
+    const positive = mapAnalysis({ ...base, valence: 0.3 }, "live").hue;
+    expect(positive).toBeLessThan(linearAt(0.3));
+  });
+
+  it("is monotonic in valence", () => {
+    let previous = Infinity;
+    for (let v = -1; v <= 1.0001; v += 0.05) {
+      const hue = mapAnalysis({ ...base, valence: v }, "live").hue;
+      expect(hue).toBeLessThan(previous);
+      previous = hue;
+    }
+  });
+
+  it("clamps valence outside the documented range", () => {
+    expect(mapAnalysis({ ...base, valence: -4 }, "live").hue).toBeCloseTo(
+      HUE_NEGATIVE,
+    );
+    expect(mapAnalysis({ ...base, valence: 4 }, "live").hue).toBeCloseTo(
+      HUE_POSITIVE,
+    );
+  });
+
   it("increases speed and turbulence with arousal", () => {
     const calm = mapAnalysis({ ...base, arousal: 0 }, "live");
     const hot = mapAnalysis({ ...base, arousal: 1 }, "live");

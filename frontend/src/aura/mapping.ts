@@ -2,11 +2,22 @@ import type { Analysis, ConnectionState } from "../types";
 
 /**
  * Cold blue for unpleasant, warm gold for pleasant. The path between them runs
- * down through teal and green, so a neutral read looks calm rather than
- * arbitrary — a deliberate choice over wrapping through magenta and red.
+ * down through teal and green — a deliberate choice over wrapping through
+ * magenta and red, which is prettier but reads less like a scale.
  */
-export const HUE_NEGATIVE = 212;
+export const HUE_NEGATIVE = 222;
 export const HUE_POSITIVE = 46;
+
+/**
+ * Valence is eased before it crosses the hue range. A linear map spends its
+ * whole middle in green, which is exactly where ordinary speech sits, so the
+ * aura would look green most of the time and true blue would only ever appear
+ * at valence -1. An exponent below 1 is steep near neutral and flat near the
+ * ends: hue leaves the green band quickly and then holds near blue and gold.
+ */
+const VALENCE_EASE = 0.55;
+
+const easeValence = (v: number) => Math.sign(v) * Math.abs(v) ** VALENCE_EASE;
 
 export interface VisualTargets {
   hue: number;
@@ -20,6 +31,7 @@ export interface VisualTargets {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+const clampSigned = (v: number) => Math.min(1, Math.max(-1, v));
 
 /** Degraded connections read as a visibly weaker field, not as an error toast. */
 const CONNECTION_DAMPING: Record<
@@ -36,8 +48,8 @@ const CONNECTION_DAMPING: Record<
 export function mapAnalysis(a: Analysis, conn: ConnectionState): VisualTargets {
   const damping = CONNECTION_DAMPING[conn];
 
-  // Valence in [-1, 1] normalized to [0, 1] before crossing the hue range.
-  const warmth = clamp01((a.valence + 1) / 2);
+  // Valence in [-1, 1], eased, then normalized to [0, 1] for the hue range.
+  const warmth = clamp01((easeValence(clampSigned(a.valence)) + 1) / 2);
   const arousal = clamp01(a.arousal);
   const certainty = clamp01(a.speaker_certainty);
   const confidence = clamp01(a.model_confidence);

@@ -107,7 +107,7 @@ scoring one utterance at a time makes the values thrash on filler words.
 
 | Signal | Visual parameter | Reasoning |
 |---|---|---|
-| valence | hue (cold blue → warm gold) | Warmth reads as pleasantness pre-verbally, so the most legible channel carries the primary emotional axis. |
+| valence | hue (cold blue → warm gold) | Warmth reads as pleasantness pre-verbally, so the most legible channel carries the primary emotional axis. Valence is eased (exponent 0.55) before crossing the hue range: a linear map spends its whole middle in green, which is where ordinary speech sits, so the aura would look green nearly always and true blue would appear only at valence -1. Eased, green is confined to roughly \|valence\| < 0.15. |
 | arousal | particle speed, noise time-step, field turbulence | Energy in the data becomes energy in the motion. Immediately readable without a legend. |
 | speaker_certainty | field coherence — high aligns particles into laminar streams, low makes the noise octaves disagree and fragments the flow into eddies | Form mirrors conviction: a decisive speaker produces order, a hedging one produces turbulence. |
 | model_confidence | saturation and opacity | Low confidence *literally looks washed out*. The visualization is honest about its own uncertainty instead of asserting a confident neutral. |
