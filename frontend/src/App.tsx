@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Controls } from "./ui/Controls";
 import { TranscriptDisplay } from "./ui/TranscriptDisplay";
 import { useAnalysis } from "./state/useAnalysis";
+import { useTranscription } from "./state/useTranscription";
 import { createDemoDriver } from "./demo/driver";
 import { Aura } from "./aura/Aura";
 import { KeywordsDisplay } from "./ui/KeywordsDisplay";
@@ -16,6 +17,7 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [lines, setLines] = useState<string[]>([]);
+  const [interim, setInterim] = useState("");
   const { analysis, analysisRef, submit, apply, lastError } = useAnalysis();
   const keywords = useKeywordCloud(analysis.keywords);
 
@@ -38,11 +40,32 @@ export default function App() {
 
   useEffect(() => () => driverRef.current.stop(), []);
 
+  // Rolling window of the last 3 utterances — scoring a single utterance makes
+  // the values thrash on filler words.
+  const windowRef = useRef<string[]>([]);
+
+  const onSpeechFinal = useCallback(
+    (text: string) => {
+      setLines((prev) => [...prev, text]);
+      windowRef.current = [...windowRef.current, text].slice(-3);
+      void submit(windowRef.current);
+    },
+    [submit],
+  );
+
+  const transcription = useTranscription({
+    onSpeechFinal,
+    onInterim: setInterim,
+    onConnectionChange: setConnection,
+  });
+
   const stop = useCallback(() => {
     driverRef.current.stop();
+    transcription.stop();
+    setInterim("");
     setRecording(false);
     setConnection("idle");
-  }, []);
+  }, [transcription]);
 
   const start = useCallback(async () => {
     setRecording(true);
@@ -57,8 +80,11 @@ export default function App() {
       await submit([SAMPLE]);
       return;
     }
-    setConnection("connecting"); // Task 7 replaces this with the real socket.
-  }, [source, submit]);
+    // A failed start leaves connection in `error`; recording must follow or the
+    // button says "Stop" while nothing is running.
+    const started = await transcription.start();
+    if (!started) setRecording(false);
+  }, [source, submit, transcription]);
 
   const toggle = () => (recording ? stop() : void start());
 
@@ -71,7 +97,7 @@ export default function App() {
   return (
     <div className="app">
       <Aura analysisRef={analysisRef} connection={connection} />
-      <TranscriptDisplay lines={lines} interim="" />
+      <TranscriptDisplay lines={lines} interim={interim} />
       <KeywordsDisplay keywords={keywords} />
       {analysis.rationale && <p className="rationale">{analysis.rationale}</p>}
       {lastError && <p className="error">{lastError}</p>}

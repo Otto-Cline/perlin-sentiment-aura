@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 from .analyzer import analyze  # noqa: E402  (must follow load_dotenv)
+from .deepgram_token import router as deepgram_router  # noqa: E402
 from .schemas import ProcessTextRequest, ProcessTextResponse  # noqa: E402
 
 app = FastAPI(title="Sentiment Aura")
@@ -20,6 +21,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(deepgram_router)
+
 
 @app.get("/health")
 async def health() -> dict[str, object]:
