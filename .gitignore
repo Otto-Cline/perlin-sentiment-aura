@@ -1,1 +1,10 @@
 .DS_Store
+.env
+.env.local
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+node_modules/
+dist/
+.vite/
