@@ -181,7 +181,7 @@ recording and errors.
 | Signal | Marker parameter | Reasoning |
 |---|---|---|
 | valence | turn sharpness | Something pleasant sweeps in long calm arcs; something unpleasant turns sharply and jerks. Eased, so a moderately negative reading already looks agitated rather than merely tilted. |
-| arousal | stroke speed and nib thickness | Energy is a fast, broad mark. Deliberately wide ranges — roughly 18× on speed and 3× on width — because narrow ones read as one continuous texture in motion. |
+| arousal | stroke speed and nib thickness | Energy is a fast, broad mark. Deliberately wide ranges — roughly 18× on speed and 9× on width — because narrow ones read as one continuous texture in motion. Width is also *curved* (exponent 1.7) rather than linear: linearly, ordinary mid-range speech already drew a broad band and the thin end never appeared, so the page was almost always thick lines. Curved, a broad nib is reserved for genuinely loud moments. |
 | model_confidence | stroke opacity | The only thing confidence touches, and the only channel that changes the mark's weight. Capped well short of opaque at every setting: a solid marker would hide the words it is meant to be marking. |
 | keyword weight | size and darkness on the page | Important words are larger and sit heavier in the paper. |
 | cumulative arousal | paper crinkle depth | The only channel that records history rather than the present. |
@@ -212,7 +212,7 @@ Measured on the demo script, marked page area:
 |---|---|
 | `0.003` | ~10%, stable from 40s out past 220s |
 | `0.001` | 51% at 22s, 72% at 44s — still climbing |
-| `0.0005` (shipped) | still largely covers the page within ~15s of an energetic passage |
+| `0.001` (shipped) | ~63% after a full pass of the demo script (~20s) |
 
 The shipped value is deliberately slow: the page becomes largely marked over a
 few minutes, which is the point — a document that gets progressively
@@ -224,10 +224,9 @@ arousal is half the deposit term. Measured around the script's loudest passage,
 the page reaches **~82% marked within 15 seconds**. Coverage readings therefore
 depend on where in the script they are taken, since arousal varies by line.
 
-The shipped fade is a small increase over `0.0003`, and the effect on coverage is
-correspondingly small — the deposit term dominates. Getting a visibly clearer
-page needs a larger bump, not a tiny one: `0.003` is the value that holds around
-10% indefinitely.
+Two things reduced coverage together: the fade increase, and curving nib width
+so mid-arousal speech no longer draws a broad band. `0.003` remains the value
+that holds around 10% indefinitely.
 
 These figures come from stepping frames while wall-clock time advances. An
 earlier set was measured by driving frames synchronously, which froze the demo's

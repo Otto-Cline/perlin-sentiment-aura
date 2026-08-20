@@ -34,9 +34,16 @@ export const HIGHLIGHTER = {
    */
   strokeCount: 1,
 
-  /** Wide on purpose: nib width is one of the two most visible channels. */
-  thicknessMin: 20,
-  thicknessMax: 56,
+  /**
+   * Very wide on purpose: nib width is one of the two most visible channels.
+   *
+   * The floor is genuinely thin. At 20 even a quiet passage drew a broad band,
+   * so the page was almost always thick lines and the channel never showed its
+   * bottom end. See AROUSAL_WIDTH_CURVE — the range is also traversed late, so
+   * mid arousal sits nearer this floor than the ceiling.
+   */
+  thicknessMin: 7,
+  thicknessMax: 62,
   speedMin: 0.6,
   speedMax: 11,
 
@@ -68,11 +75,12 @@ export const HIGHLIGHTER = {
    *   0.0010 — 51% at 22s, 72% at 44s; still climbing.
    *   0.0003 — 63% at 20s; keeps climbing.
    *
-   * At this value the page becomes largely marked over a few minutes, which is
-   * the intent: a document that gets progressively highlighted. Set 0.003 if a
-   * mostly-clear page that holds indefinitely is wanted instead.
+   * The page still becomes largely marked over a few minutes, which is the
+   * intent — a document that gets progressively highlighted — but reaches it
+   * more slowly than the slower settings above. Set 0.003 if a mostly-clear
+   * page that holds indefinitely is wanted instead.
    */
-  fadeRate: 0.0005,
+  fadeRate: 0.001,
 
   /** Frames drawn before first display, so the page is never blank. */
   seedSteps: 140,

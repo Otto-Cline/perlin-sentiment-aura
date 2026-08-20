@@ -71,7 +71,30 @@ describe("mapHighlighter", () => {
     const hot = mapHighlighter({ ...base, arousal: 1 }, "live", 0);
     // Wide ratios on purpose: narrow ones read as one continuous texture.
     expect(hot.speed / calm.speed).toBeGreaterThan(8);
-    expect(hot.thickness / calm.thickness).toBeGreaterThan(2);
+    expect(hot.thickness / calm.thickness).toBeGreaterThan(6);
+  });
+
+  it("keeps a broad nib for genuinely loud moments only", () => {
+    // Linearly, ordinary mid-range speech was already drawing a thick band and
+    // the thin end never appeared. Mid arousal must sit nearer the floor.
+    const mid = mapHighlighter({ ...base, arousal: 0.5 }, "live", 0).thickness;
+    const span = HIGHLIGHTER.thicknessMax - HIGHLIGHTER.thicknessMin;
+    const fromFloor = (mid - HIGHLIGHTER.thicknessMin) / span;
+    expect(fromFloor).toBeLessThan(0.4);
+  });
+
+  it("still reaches a genuinely thin nib at low arousal", () => {
+    const quiet = mapHighlighter({ ...base, arousal: 0.15 }, "live", 0);
+    expect(quiet.thickness).toBeLessThan(14);
+  });
+
+  it("keeps nib width monotonic in arousal", () => {
+    let previous = -Infinity;
+    for (let a = 0; a <= 1.0001; a += 0.05) {
+      const width = mapHighlighter({ ...base, arousal: a }, "live", 0).thickness;
+      expect(width).toBeGreaterThan(previous);
+      previous = width;
+    }
   });
 
   it("varies opacity widely with confidence, and nothing else", () => {

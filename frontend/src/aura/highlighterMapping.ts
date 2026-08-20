@@ -38,6 +38,16 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 /** Eased so the midband stays narrow, as in the previous renderers. */
 const VALENCE_EASE = 0.55;
 
+/**
+ * Arousal is curved before it sets nib width. Above 1, so width ramps late.
+ *
+ * Linearly, ordinary speech sits mid-range and mid-range was already a broad
+ * band — the page ended up almost entirely thick lines and the thin end never
+ * appeared. Curved, a broad nib is reserved for genuinely loud moments and
+ * everything below reads as a finer mark.
+ */
+const AROUSAL_WIDTH_CURVE = 1.7;
+
 /** A degraded connection reads as a weaker, slower marker. */
 const CONNECTION_DAMPING: Record<
   ConnectionState,
@@ -77,7 +87,7 @@ export function mapHighlighter(
     thickness: lerp(
       HIGHLIGHTER.thicknessMin,
       HIGHLIGHTER.thicknessMax,
-      arousal,
+      arousal ** AROUSAL_WIDTH_CURVE,
     ),
 
     // Valence is the gesture. Something pleasant sweeps in long calm arcs;
