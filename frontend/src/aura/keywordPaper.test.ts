@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   WRITE_MS,
+  halfExtents,
   mergePlaced,
   placeKeyword,
   sizeForWeight,
@@ -74,6 +75,29 @@ describe("placeKeyword", () => {
       const insideY = p.y > panel.y && p.y < panel.y + panel.height;
       expect(insideX && insideY).toBe(false);
     }
+  });
+
+  it("keeps a word's whole bounding box out of a panel, not just its centre", () => {
+    // The bug this guards: checking only the centre let long words clear the
+    // panel by their midpoint while their glyphs overhung into it.
+    const panel = { x: 40, y: 480, width: 460, height: 280 };
+    for (let i = 0; i < 300; i++) {
+      const p = placeKeyword([], { text: "deployment", weight: 1 }, W, H, 0, [
+        panel,
+      ]);
+      const { halfW, halfH } = halfExtents(p.text, p.size);
+      const overlapsX =
+        p.x + halfW > panel.x && p.x - halfW < panel.x + panel.width;
+      const overlapsY =
+        p.y + halfH > panel.y && p.y - halfH < panel.y + panel.height;
+      expect(overlapsX && overlapsY).toBe(false);
+    }
+  });
+
+  it("treats handwriting as wider than a third of its point size per character", () => {
+    // An underestimate here is what let words bleed under the transcript.
+    const { halfW } = halfExtents("deployment", 44);
+    expect(halfW * 2).toBeGreaterThan(180);
   });
 
   it("avoids several reserved panels at once", () => {

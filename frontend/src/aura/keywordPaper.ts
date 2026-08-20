@@ -67,7 +67,23 @@ export interface Rect {
 }
 
 /** Clearance kept between a word and a reserved panel. */
-const RESERVED_PAD = 10;
+const RESERVED_PAD = 16;
+
+/**
+ * Estimated half-extents of a rendered word.
+ *
+ * Deliberately generous. These feed the reserved-panel test, and an
+ * underestimate is the failure that matters: the word's centre clears the panel
+ * while its glyphs overhang into it. Handwriting faces are wider per character
+ * than the 0.3 factor first used here, which let words bleed under the
+ * transcript. Over-estimating only costs a little spacing.
+ */
+export function halfExtents(text: string, size: number) {
+  return {
+    halfW: (text.length * size * 0.52) / 2,
+    halfH: size * 0.78,
+  };
+}
 
 function intersectsReserved(
   cx: number,
@@ -108,9 +124,7 @@ export function placeKeyword(
   rand: () => number = Math.random,
 ): PlacedKeyword {
   const size = sizeForWeight(keyword.weight);
-  // Rough text extent, enough for spacing decisions.
-  const halfW = (keyword.text.length * size * 0.3) / 2;
-  const halfH = size * 0.6;
+  const { halfW, halfH } = halfExtents(keyword.text, size);
   const marginX = Math.min(width / 2 - 1, halfW + 24);
   const marginY = Math.min(height / 2 - 1, size + 24);
 

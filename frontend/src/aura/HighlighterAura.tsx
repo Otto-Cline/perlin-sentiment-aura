@@ -11,6 +11,7 @@ import {
   type Rect,
 } from "./keywordPaper";
 import { mapHighlighter } from "./highlighterMapping";
+import { VISIBLE_LINES } from "../ui/transcriptLines";
 import { HIGHLIGHTER } from "./preset";
 import type { PaperWear } from "./wear";
 
@@ -28,20 +29,42 @@ const FADE_BITE = 0.004;
 /** UI that words must not be written behind. */
 const RESERVED_SELECTOR = ".transcript, .controls, .rationale";
 
+/** Fallback line height if the transcript has no committed lines to measure. */
+const ASSUMED_LINE_HEIGHT = 28;
+
 /**
- * Regions the UI currently covers, in canvas coordinates.
+ * Regions the UI covers — including space it has not grown into yet.
  *
- * Measured from the DOM rather than hard-coded: the transcript panel grows as
- * lines arrive, and the layout is responsive. The canvas is fixed at inset 0 at
- * pixelDensity 1, so client coordinates are canvas coordinates.
+ * Measured from the DOM rather than hard-coded, since the layout is responsive.
+ * The canvas is fixed at inset 0 at pixelDensity 1, so client coordinates are
+ * canvas coordinates.
  *
- * Read only when words are placed, which is once per analysis update — cheap
- * enough, and it always reflects the panel's current height.
+ * The transcript panel is the reason this is not simply a bounding rect. It is
+ * bottom-anchored and grows upward as lines arrive, so reserving only its
+ * current extent leaves words legally placed above it — and then swallowed when
+ * the next line pushes its top edge up over them. Reserving the panel at full
+ * capacity is what makes a placement safe for the rest of the session.
  */
 function reservedRects(): Rect[] {
   return Array.from(document.querySelectorAll(RESERVED_SELECTOR)).map((el) => {
     const r = el.getBoundingClientRect();
-    return { x: r.left, y: r.top, width: r.width, height: r.height };
+    if (!el.classList.contains("transcript")) {
+      return { x: r.left, y: r.top, width: r.width, height: r.height };
+    }
+
+    const lines = Array.from(el.querySelectorAll<HTMLElement>(".final"));
+    // Tallest existing line, so a wrapped line is not under-counted.
+    const perLine = lines.length
+      ? Math.max(...lines.map((l) => l.offsetHeight + 8))
+      : ASSUMED_LINE_HEIGHT;
+    const growth = Math.max(0, VISIBLE_LINES - lines.length) * perLine;
+
+    return {
+      x: r.left,
+      y: r.top - growth,
+      width: r.width,
+      height: r.height + growth,
+    };
   });
 }
 

@@ -68,8 +68,17 @@ spans, so a later edit cannot quietly flatten the demo.
 
 **Keywords are never written behind the UI.** Candidate positions overlapping
 the transcript panel, the controls or the rationale are rejected at placement.
-The rects are measured from the DOM at placement time rather than hard-coded,
-since the transcript panel grows as lines arrive and the layout is responsive.
+The rects are measured from the DOM rather than hard-coded, since the layout is
+responsive.
+
+Two things made this harder than a bounding-box test. The transcript panel is
+bottom-anchored and **grows upward** as lines arrive, so reserving its current
+extent left words placed legally above it and swallowed a few seconds later —
+placement therefore reserves the panel at *full* capacity, extrapolating from the
+tallest existing line. And the word extent estimate was too narrow for
+handwriting, so a word's centre cleared the panel while its glyphs overhung into
+it. Both are covered by tests, including one that asserts the whole bounding box
+clears a panel rather than just the centre point.
 
 ## Architecture
 
