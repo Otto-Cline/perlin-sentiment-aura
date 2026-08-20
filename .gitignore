@@ -1,6 +1,10 @@
 .DS_Store
 .env
 .env.local
+
+# The take-home brief and my own planning notes. Kept locally, never published:
+# the brief is the hiring team's material, not mine to put on the open internet.
+reference/
 __pycache__/
 *.pyc
 .venv/
