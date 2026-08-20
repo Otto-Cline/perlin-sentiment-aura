@@ -1,8 +1,10 @@
 # Sentiment Aura
 
 A live speech Perlin field visualization in which your words animate a highlighter on a page.
-As you speak, the highlighter draws lines on a page corresponding to sentiment. Over time, the paper
+As you speak, the highlighter draws lines on a paper corresponding to sentiment. Over time, the paper
 will crinkle if the highlighter is used heavy-handedly (corresponding to a more urgent sentiment).
+
+[![Watch the demo](https://youtu.be/PJVE0zh8Gzs)]
 
 **Two modes**, chosen bottom-left. **Live mic** is the real thing. **Demo** plays
 a scripted six-line conversation with no microphone and no network.
@@ -33,8 +35,8 @@ Note: I explicitly took a risk in that I didn't involve color changes as part of
 | signal | what it drives | why |
 |---|---|---|
 | valence | turn sharpness | pleasant sweeps in long calm arcs; unpleasant turns sharply and jerks |
-| arousal | speed and nib width | energy is a fast, broad mark — legible twice over |
-| model_confidence | opacity | an unsure read barely marks the page; capped short of opaque so words stay readable |
+| arousal | speed and nib width | energy is a fast, broad mark |
+| model_confidence | opacity | an unsure read barely marks the page |
 | keyword weight | size and darkness | important words are larger and sit heavier |
 | *cumulative* arousal | paper crinkle depth | the only channel that records history rather than the present |
 
