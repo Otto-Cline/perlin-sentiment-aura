@@ -3,8 +3,12 @@ import p5 from "p5";
 import type { RefObject } from "react";
 import type { Analysis, ConnectionState, Keyword } from "../types";
 import { blitPaper, createPaperLayer } from "./paper";
-import { createHighlighterLayer } from "./highlighter";
-import { drawKeywords, mergePlaced, type PlacedKeyword } from "./keywordPaper";
+import { compositeMarker, createHighlighterLayer } from "./highlighter";
+import {
+  createKeywordLayer,
+  mergePlaced,
+  type PlacedKeyword,
+} from "./keywordPaper";
 import { mapHighlighter } from "./highlighterMapping";
 import { HIGHLIGHTER } from "./preset";
 import type { PaperWear } from "./wear";
@@ -51,6 +55,7 @@ export function HighlighterAura({
 
       let paper: ReturnType<typeof createPaperLayer> | null = null;
       let marker: ReturnType<typeof createHighlighterLayer> | null = null;
+      let words: ReturnType<typeof createKeywordLayer> | null = null;
       let placed: PlacedKeyword[] = [];
       let seenKeywords: Keyword[] | null = null;
       let eased = targetsNow();
@@ -74,10 +79,11 @@ export function HighlighterAura({
         // Built here, not in the closure: p.windowWidth is still 0 above.
         paper = createPaperLayer(p.width, p.height);
         marker = createHighlighterLayer(p.width, p.height);
+        words = createKeywordLayer(p.width, p.height);
       };
 
       p.draw = () => {
-        if (!paper || !marker) return;
+        if (!paper || !marker || !words) return;
 
         const target = targetsNow();
         for (const key of Object.keys(eased) as (keyof typeof eased)[]) {
@@ -120,22 +126,22 @@ export function HighlighterAura({
 
         marker.step(markerParams(), t);
 
+        // Words are rendered to their own layer and knocked down wherever the
+        // marker covers them, so the marker plainly sits on top.
+        words.render(placed, now, marker.canvas);
+
         const ctx = p.drawingContext as CanvasRenderingContext2D;
         ctx.clearRect(0, 0, p.width, p.height);
         blitPaper(ctx, paper, p.width, p.height);
-        drawKeywords(ctx, placed, now);
-
-        // The marker is translucent ink over the page, so it multiplies.
-        ctx.save();
-        ctx.globalCompositeOperation = "multiply";
-        ctx.drawImage(marker.canvas, 0, 0);
-        ctx.restore();
+        ctx.drawImage(words.canvas, 0, 0);
+        compositeMarker(ctx, marker.canvas);
       };
 
       p.windowResized = () => {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
         paper?.resize(p.width, p.height);
         marker?.resize(p.width, p.height);
+        words?.resize(p.width, p.height);
         paper?.invalidate();
         seeded = false;
       };

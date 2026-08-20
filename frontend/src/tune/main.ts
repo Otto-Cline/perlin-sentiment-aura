@@ -8,8 +8,12 @@
 
 import "./tune.css";
 import { blitPaper, createPaperLayer } from "../aura/paper";
-import { createHighlighterLayer } from "../aura/highlighter";
-import { drawKeywords, mergePlaced, type PlacedKeyword } from "../aura/keywordPaper";
+import { compositeMarker, createHighlighterLayer } from "../aura/highlighter";
+import {
+  createKeywordLayer,
+  mergePlaced,
+  type PlacedKeyword,
+} from "../aura/keywordPaper";
 import { PaperWear } from "../aura/wear";
 import { HIGHLIGHTER } from "../aura/preset";
 
@@ -107,6 +111,7 @@ const ctx = view.getContext("2d")!;
 
 let paper = createPaperLayer(1, 1);
 let marker = createHighlighterLayer(1, 1);
+let words = createKeywordLayer(1, 1);
 let placed: PlacedKeyword[] = [];
 const wear = new PaperWear();
 
@@ -189,6 +194,7 @@ function resize() {
   view.height = stage.clientHeight;
   paper.resize(view.width, view.height);
   marker.resize(view.width, view.height);
+  words.resize(view.width, view.height);
   paper.invalidate();
   syncKeywords();
   reseed();
@@ -233,14 +239,12 @@ function renderOnce(now: number) {
 
   marker.step(markerParams(), t);
 
+  words.render(placed, now, marker.canvas);
+
   ctx.clearRect(0, 0, view.width, view.height);
   blitPaper(ctx, paper, view.width, view.height);
-  drawKeywords(ctx, placed, now);
-
-  ctx.save();
-  ctx.globalCompositeOperation = "multiply";
-  ctx.drawImage(marker.canvas, 0, 0);
-  ctx.restore();
+  ctx.drawImage(words.canvas, 0, 0);
+  compositeMarker(ctx, marker.canvas);
 }
 
 function frame(now: number) {

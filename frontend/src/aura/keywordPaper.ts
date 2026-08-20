@@ -15,8 +15,36 @@ export interface PlacedKeyword {
   x: number;
   y: number;
   size: number;
-  /** Frame-independent age, for the fade-in. */
+  /** Radians of tilt, fixed at placement. Nothing hand-written sits square. */
+  tilt: number;
+  /** Frame-independent age, for the write-on. */
   bornAt: number;
+}
+
+/** Peak tilt either side of level. Small — a lean, not a slant. */
+const MAX_TILT = 0.055;
+
+/** How long a word takes to write itself on. */
+export const WRITE_MS = 620;
+
+/**
+ * Handwriting from the system stack rather than a webfont: a demo runs on
+ * unknown networks and a font that fails to load is a visible failure. Leads
+ * with macOS handwriting faces, so it degrades to a generic cursive elsewhere.
+ */
+const HAND_FONT =
+  '"Bradley Hand", "Noteworthy", "Marker Felt", "Segoe Print", ' +
+  '"Comic Sans MS", cursive';
+
+/**
+ * Fraction of a word that has been written, [0, 1].
+ *
+ * Real stroke-by-stroke handwriting would need per-glyph path data. Revealing
+ * the word left to right behind a growing clip is the same gesture at a
+ * fraction of the cost — it reads as a hand moving across the page.
+ */
+export function writeProgress(bornAt: number, now: number): number {
+  return clamp01((now - bornAt) / WRITE_MS);
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -66,7 +94,15 @@ export function placeKeyword(
     if (clearance > best.clearance) best = { x, y, clearance };
   }
 
-  return { text: keyword.text, weight: keyword.weight, x: best.x, y: best.y, size, bornAt: now };
+  return {
+    text: keyword.text,
+    weight: keyword.weight,
+    x: best.x,
+    y: best.y,
+    size,
+    tilt: (rand() * 2 - 1) * MAX_TILT,
+    bornAt: now,
+  };
 }
 
 /** Adds new words, refreshes repeats, and drops the oldest past the cap. */
@@ -101,33 +137,108 @@ export function mergePlaced(
   return next;
 }
 
-/** Opacity for a word's entrance, [0, 1]. */
-export function keywordFadeIn(bornAt: number, now: number): number {
-  const FADE_MS = 900;
-  return clamp01((now - bornAt) / FADE_MS);
+/**
+ * How much of a word's own opacity the marker removes where it crosses it.
+ *
+ * Applied on the words' own layer with `destination-out`, so the erase is
+ * proportional to the marker's alpha at each pixel. Kept below 1 so a heavily
+ * marked passage stays legible rather than vanishing.
+ */
+const TEXT_KNOCKDOWN = 0.8;
+
+export interface KeywordLayer {
+  readonly canvas: HTMLCanvasElement;
+  /** Redraws the words, then lowers their opacity under the marker. */
+  render(
+    placed: PlacedKeyword[],
+    now: number,
+    markerCanvas: HTMLCanvasElement,
+  ): void;
+  resize(width: number, height: number): void;
 }
 
-const FONT_STACK =
-  '"New York", "Iowan Old Style", Georgia, "Times New Roman", serif';
+/**
+ * The words, on their own layer.
+ *
+ * A separate layer exists so the marker can lower the words' opacity directly.
+ * Compositing the marker over the words cannot do it: `multiply` leaves dark
+ * pixels untouched, and a normal-blend veil strong enough to be visible on text
+ * also washes the whole page pink.
+ */
+export function createKeywordLayer(
+  width: number,
+  height: number,
+): KeywordLayer {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, width);
+  canvas.height = Math.max(1, height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("keyword layer: 2D context unavailable");
 
-/** Draws the page's words. Ink, not marker — the highlighter goes over these. */
+  return {
+    canvas,
+
+    render(placed, now, markerCanvas) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawKeywords(ctx, placed, now);
+
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.globalAlpha = TEXT_KNOCKDOWN;
+      ctx.drawImage(markerCanvas, 0, 0);
+      ctx.restore();
+    },
+
+    resize(w, h) {
+      canvas.width = Math.max(1, w);
+      canvas.height = Math.max(1, h);
+    },
+  };
+}
+
+/**
+ * Draws the page's words, written on by hand.
+ *
+ * Ink, not marker — the highlighter goes over these afterwards.
+ */
 export function drawKeywords(
   ctx: CanvasRenderingContext2D,
   placed: PlacedKeyword[],
   now: number,
 ): void {
   ctx.save();
-  ctx.textAlign = "center";
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
 
   for (const word of placed) {
-    const fade = keywordFadeIn(word.bornAt, now);
-    if (fade <= 0) continue;
-    ctx.font = `${word.size}px ${FONT_STACK}`;
+    const written = writeProgress(word.bornAt, now);
+    if (written <= 0) continue;
+
+    ctx.font = `${word.size}px ${HAND_FONT}`;
+    const width = ctx.measureText(word.text).width;
+
+    ctx.save();
+    ctx.translate(word.x, word.y);
+    ctx.rotate(word.tilt);
+
+    if (written < 1) {
+      // Clip to the written portion, so the word appears left to right.
+      ctx.beginPath();
+      ctx.rect(
+        -width / 2,
+        -word.size,
+        width * written,
+        word.size * 2,
+      );
+      ctx.clip();
+    }
+
     // Heavier words sit darker on the page as well as larger.
     const darkness = 0.42 + word.weight * 0.38;
-    ctx.fillStyle = `rgba(27, 26, 23, ${(darkness * fade).toFixed(3)})`;
-    ctx.fillText(word.text, word.x, word.y);
+    ctx.fillStyle = `rgba(27, 26, 23, ${darkness.toFixed(3)})`;
+    ctx.fillText(word.text, -width / 2, 0);
+
+    ctx.restore();
   }
 
   ctx.restore();

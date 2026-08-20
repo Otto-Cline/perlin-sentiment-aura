@@ -40,6 +40,36 @@ const KINK_RADIANS = 1.1;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 /**
+ * How strongly the marker veils what is beneath it.
+ *
+ * `multiply` alone leaves dark pixels untouched — multiply(pink, black) is
+ * black — so a marker passing over a word had literally no effect on it, and the
+ * word read as sitting on top. Real highlighter ink lies above the text and
+ * scatters some light, lowering its contrast. This second pass supplies that.
+ */
+const VEIL_STRENGTH = 0.55;
+
+/**
+ * Lays the marker over the page: a multiply pass to tint the paper like ink,
+ * then a lighter normal pass to veil whatever it crosses, words included.
+ */
+export function compositeMarker(
+  target: CanvasRenderingContext2D,
+  markerCanvas: HTMLCanvasElement,
+): void {
+  target.save();
+
+  target.globalCompositeOperation = "multiply";
+  target.drawImage(markerCanvas, 0, 0);
+
+  target.globalCompositeOperation = "source-over";
+  target.globalAlpha = VEIL_STRENGTH;
+  target.drawImage(markerCanvas, 0, 0);
+
+  target.restore();
+}
+
+/**
  * Signed shortest rotation from `from` to `to`, in [-PI, PI].
  *
  * Without the wrap, a heading crossing 0/2PI turns the long way round and the

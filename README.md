@@ -110,10 +110,28 @@ scoring one utterance at a time makes the values thrash on filler words.
 Three layers, back to front:
 
 1. **Paper** — a crinkled surface, shaded from the noise field.
-2. **Keywords** — the model's keywords printed onto the page as they arrive,
-   sized and darkened by weight, and left there.
-3. **Highlighter** — two translucent pink markers tracing the field, composited
-   with `multiply` so the words stay readable underneath.
+2. **Keywords** — the model's keywords written onto the page as they arrive,
+   sized and darkened by weight, and left there. Each word is set in handwriting
+   from the system font stack, tilted slightly off level, and *written on* left
+   to right behind a growing clip rectangle. True stroke-by-stroke handwriting
+   would need per-glyph path data; a left-to-right reveal is the same gesture
+   for a fraction of the cost.
+3. **Highlighter** — one translucent pink marker tracing the field.
+
+**Getting the marker to look like it is on top took three passes, not one.**
+`multiply` alone tints the paper like ink but leaves dark pixels untouched —
+`multiply(pink, black)` is black — so a marker crossing a word had literally no
+effect on it and the word read as sitting above the ink. So:
+
+- the words render to their own layer, and the marker is used as a
+  `destination-out` eraser on that layer, lowering the words' own opacity in
+  proportion to the marker's alpha (measured: text under a mark sits ~33 luma
+  lighter than bare text, against ~7 for a veil alone);
+- the marker then composites over the page with `multiply` for the paper tint;
+- followed by a lighter normal-blend pass to veil what it crosses.
+
+The knockdown is capped below full, so a heavily marked passage stays legible
+instead of disappearing.
 
 **The marker never targets the words.** The Perlin field is the only thing
 steering it; whichever keywords happen to lie under the path get marked. That
@@ -272,8 +290,13 @@ justified by the error-handling rubric line and by being the live-demo fallback.
   `useTranscription` and `App` was verified in a browser rather than with a
   testing library. Pure logic is unit-tested; rendering is not.
 - **Reduced motion is implemented but not exercised.** `prefers-reduced-motion`
-  zeroes the word, keyword and pill animations. The rule is in place; no
-  environment was available to assert it with the preference actually set.
+  zeroes the transcript word and pill animations. The rule is in place; no
+  environment was available to assert it with the preference actually set. Note
+  it does not cover the canvas — the marker and the write-on are drawn, not CSS.
+- **The handwriting font is a system stack.** It leads with macOS faces
+  (Bradley Hand, Noteworthy, Marker Felt) and falls back to generic `cursive`.
+  Deliberate: a webfont that fails to load on unknown demo wifi is a visible
+  failure. On a non-Mac the words will still be handwriting, but not these.
 
 ## Tests
 

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  keywordFadeIn,
+  WRITE_MS,
   mergePlaced,
   placeKeyword,
   sizeForWeight,
+  writeProgress,
 } from "./keywordPaper";
 import { HIGHLIGHTER } from "./preset";
 
@@ -47,7 +48,7 @@ describe("placeKeyword", () => {
     // Two candidates: the first lands on top of an existing word, the second is
     // far away. The far one must win.
     const existing = [
-      { text: "old", weight: 0.5, x: 100, y: 100, size: 20, bornAt: 0 },
+      { text: "old", weight: 0.5, x: 100, y: 100, size: 20, tilt: 0, bornAt: 0 },
     ];
     const rand = sequence([100 / W, 100 / H, 0.9, 0.9]);
     const placed = placeKeyword(
@@ -115,15 +116,39 @@ describe("mergePlaced", () => {
   });
 });
 
-describe("keywordFadeIn", () => {
-  it("starts invisible and ends opaque", () => {
-    expect(keywordFadeIn(0, 0)).toBe(0);
-    expect(keywordFadeIn(0, 10_000)).toBe(1);
+describe("writeProgress", () => {
+  it("starts unwritten and finishes complete", () => {
+    expect(writeProgress(0, 0)).toBe(0);
+    expect(writeProgress(0, WRITE_MS)).toBe(1);
+    expect(writeProgress(0, 10_000)).toBe(1);
   });
 
-  it("is partway through mid-entrance", () => {
-    const mid = keywordFadeIn(0, 450);
-    expect(mid).toBeGreaterThan(0);
-    expect(mid).toBeLessThan(1);
+  it("is partway through mid-stroke", () => {
+    const mid = writeProgress(0, WRITE_MS / 2);
+    expect(mid).toBeGreaterThan(0.4);
+    expect(mid).toBeLessThan(0.6);
+  });
+
+  it("never goes negative for a word placed in the future", () => {
+    expect(writeProgress(1000, 0)).toBe(0);
+  });
+});
+
+describe("tilt", () => {
+  it("leans every word slightly off level", () => {
+    // Nothing hand-written sits perfectly square.
+    let sawTilt = false;
+    for (let i = 0; i < 40; i++) {
+      const p = placeKeyword([], { text: "logs", weight: 0.5 }, W, H, 0);
+      expect(Math.abs(p.tilt)).toBeLessThan(0.12);
+      if (Math.abs(p.tilt) > 0.005) sawTilt = true;
+    }
+    expect(sawTilt).toBe(true);
+  });
+
+  it("keeps a word's tilt fixed once placed", () => {
+    const first = mergePlaced([], [{ text: "logs", weight: 0.4 }], W, H, 0);
+    const again = mergePlaced(first, [{ text: "logs", weight: 0.9 }], W, H, 500);
+    expect(again[0].tilt).toBe(first[0].tilt);
   });
 });
