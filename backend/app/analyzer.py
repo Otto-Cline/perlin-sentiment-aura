@@ -16,30 +16,57 @@ from .schemas import NEUTRAL, Analysis
 
 log = logging.getLogger(__name__)
 
-MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-5")
+MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
 # Total wall-clock budget. max_retries=0 below is load-bearing: the SDK retries
-# timeouts by default, which would turn this into a 15s budget.
-LLM_TIMEOUT_SECONDS = 5.0
+# timeouts by default, which would turn this into a 24s budget.
+#
+# Measured on this prompt, four utterances each:
+#   claude-opus-5    median 4.67s, max 5.88s  — exceeds a 5s budget
+#   claude-sonnet-5  median 3.08s, max 3.20s
+#   claude-haiku-4-5 median 2.15s, max 6.73s  — fast but with outliers
+# Hence sonnet by default and 8s of headroom: a timeout costs a whole utterance,
+# and the aura visibly drops to neutral when it happens.
+LLM_TIMEOUT_SECONDS = 8.0
+
+# Models that accept output_config.effort. Haiku 4.5 rejects it outright with
+# "This model does not support the effort parameter" (400), so switching
+# ANTHROPIC_MODEL to it used to break every call. Unknown models omit effort,
+# which is always valid.
+EFFORT_CAPABLE = {
+    "claude-fable-5",
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-sonnet-5",
+    "claude-sonnet-4-6",
+}
 
 # Hand-written rather than generated from the Pydantic model: model_json_schema()
 # emits $defs/$ref for the nested Keyword, and a flat inline schema is the shape
-# the API is documented to accept. schemas.Analysis remains the validator.
+# the API accepts. schemas.Analysis remains the validator.
+#
+# Structured output constrains SHAPE ONLY. It rejects JSON Schema validation
+# keywords, verified against the live API:
+#   "For 'number' type, properties maximum, minimum are not supported"
+#   "For 'array' type, property 'maxItems' is not supported"
+# So no minimum/maximum/maxItems here. Ranges are stated in the system prompt and
+# enforced by schemas.Analysis, which clamps on ingest.
 ANALYSIS_JSON_SCHEMA = {
     "type": "object",
     "properties": {
-        "valence": {"type": "number", "minimum": -1, "maximum": 1},
-        "arousal": {"type": "number", "minimum": 0, "maximum": 1},
-        "speaker_certainty": {"type": "number", "minimum": 0, "maximum": 1},
-        "model_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "valence": {"type": "number"},
+        "arousal": {"type": "number"},
+        "speaker_certainty": {"type": "number"},
+        "model_confidence": {"type": "number"},
         "keywords": {
             "type": "array",
-            "maxItems": 6,
             "items": {
                 "type": "object",
                 "properties": {
                     "text": {"type": "string"},
-                    "weight": {"type": "number", "minimum": 0, "maximum": 1},
+                    "weight": {"type": "number"},
                 },
                 "required": ["text", "weight"],
                 "additionalProperties": False,
@@ -69,8 +96,9 @@ speaker_certainty: how assertive the speaker sounds. Hedging ("maybe", "I \
 guess", "sort of") is low; flat declarative claims are high.
 model_confidence: how confident YOU are in your own read. Sarcasm, filler, \
 one-word utterances, and logistics chatter should be low.
-keywords: at most 4 content words actually present in the utterance, weighted \
-by how much they carry its meaning. Skip function words.
+keywords: at most 4 SINGLE words, each appearing verbatim in the utterance, \
+weighted by how much it carries the meaning. One word per entry — never a \
+phrase, never two words joined. Skip function words.
 rationale: one short sentence.
 
 This is speech, so expect disfluency and fragments. Do not inflate \
@@ -78,6 +106,20 @@ model_confidence on thin input."""
 
 
 _client = AsyncAnthropic()
+
+
+def _output_config() -> dict:
+    """Structured output, plus low effort where the model accepts it.
+
+    effort=low keeps adaptive thinking from spending the whole latency budget on
+    what is a short classification task.
+    """
+    config: dict = {
+        "format": {"type": "json_schema", "schema": ANALYSIS_JSON_SCHEMA}
+    }
+    if MODEL in EFFORT_CAPABLE:
+        config["effort"] = "low"
+    return config
 
 
 async def analyze(utterances: list[str]) -> Analysis:
@@ -92,12 +134,7 @@ async def analyze(utterances: list[str]) -> Analysis:
             model=MODEL,
             max_tokens=1024,
             system=SYSTEM,
-            # effort=low keeps adaptive thinking from spending the whole budget
-            # on what is a short classification task.
-            output_config={
-                "effort": "low",
-                "format": {"type": "json_schema", "schema": ANALYSIS_JSON_SCHEMA},
-            },
+            output_config=_output_config(),
             messages=[
                 {
                     "role": "user",

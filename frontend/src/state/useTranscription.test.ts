@@ -1,5 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { MAX_BACKOFF_MS, backoffDelay, shouldSubmit } from "./useTranscription";
+import {
+  MAX_BACKOFF_MS,
+  backoffDelay,
+  chooseAuth,
+  shouldSubmit,
+} from "./useTranscription";
+
+describe("chooseAuth", () => {
+  it("prefers a minted token so the key never reaches the browser", () => {
+    const auth = chooseAuth("jwt-abc", "raw-key");
+    expect(auth).toEqual({ protocols: ["bearer", "jwt-abc"], mode: "token" });
+  });
+
+  it("falls back to the browser key when no token could be minted", () => {
+    // Minting needs a Deepgram key with permission to do so; one without it
+    // returns FORBIDDEN. Falling back keeps the demo working.
+    const auth = chooseAuth(null, "raw-key");
+    expect(auth).toEqual({ protocols: ["token", "raw-key"], mode: "key" });
+  });
+
+  it("uses the documented subprotocol name for each credential type", () => {
+    // Verified against Deepgram: ["token", KEY] negotiates protocol "token".
+    expect(chooseAuth(null, "k")?.protocols[0]).toBe("token");
+    expect(chooseAuth("t", undefined)?.protocols[0]).toBe("bearer");
+  });
+
+  it("returns null when there is no credential at all", () => {
+    expect(chooseAuth(null, undefined)).toBeNull();
+    expect(chooseAuth(null, "")).toBeNull();
+  });
+
+  it("ignores an empty token rather than opening an unauthenticated socket", () => {
+    expect(chooseAuth("", "raw-key")?.mode).toBe("key");
+  });
+});
 
 describe("backoffDelay", () => {
   it("grows exponentially", () => {

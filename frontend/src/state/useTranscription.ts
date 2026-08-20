@@ -11,14 +11,44 @@ const DEEPGRAM_URL =
 
 /**
  * Browsers cannot set WebSocket headers, so credentials ride the
- * Sec-WebSocket-Protocol header. The documented API-key form is
- * ["token", KEY]; a minted JWT uses the Bearer scheme.
+ * Sec-WebSocket-Protocol header.
  *
- * If the handshake fails with a valid token, switch to keySubprotocol and set
- * VITE_DEEPGRAM_KEY — the README documents that as a known tradeoff.
+ * `["token", KEY]` is the documented API-key form and is verified working — a
+ * handshake against Deepgram negotiated protocol "token". A minted JWT uses the
+ * Bearer scheme instead; that path is unverified, because the key available
+ * during development lacked permission to mint tokens.
  */
 const jwtSubprotocol = (token: string) => ["bearer", token];
-export const keySubprotocol = (key: string) => ["token", key];
+const keySubprotocol = (key: string) => ["token", key];
+
+export type AuthMode = "token" | "key";
+
+export interface SocketAuth {
+  protocols: string[];
+  mode: AuthMode;
+}
+
+/**
+ * Chooses how to authenticate the socket.
+ *
+ * A short-lived token is always preferred, so the API key never reaches the
+ * browser. The key is a deliberate fallback: minting a token requires a
+ * Deepgram key with permission to do so, and a key without it returns
+ * `FORBIDDEN / Insufficient permissions`. Falling back keeps the demo working
+ * and upgrades itself the moment a token-capable key is supplied.
+ */
+export function chooseAuth(
+  accessToken: string | null,
+  envKey: string | undefined,
+): SocketAuth | null {
+  if (accessToken) {
+    return { protocols: jwtSubprotocol(accessToken), mode: "token" };
+  }
+  if (envKey) {
+    return { protocols: keySubprotocol(envKey), mode: "key" };
+  }
+  return null;
+}
 
 const KEEPALIVE_MS = 8000; // Deepgram drops the socket after ~10s of silence.
 export const MAX_BACKOFF_MS = 8000;
@@ -98,11 +128,33 @@ export function useTranscription({
   const connect = useCallback(async () => {
     onConnectionChange(attemptRef.current === 0 ? "connecting" : "reconnecting");
 
-    const res = await fetch(`${API_BASE}/deepgram_token`);
-    if (!res.ok) throw new Error(`token endpoint returned ${res.status}`);
-    const { access_token } = (await res.json()) as { access_token: string };
+    // Ask the backend to mint a token; fall back to a browser key if it cannot.
+    let accessToken: string | null = null;
+    try {
+      const res = await fetch(`${API_BASE}/deepgram_token`);
+      if (res.ok) {
+        const body = (await res.json()) as { access_token?: string };
+        accessToken = body.access_token ?? null;
+      }
+    } catch {
+      // Backend unreachable — the key fallback below may still work.
+    }
 
-    const socket = new WebSocket(DEEPGRAM_URL, jwtSubprotocol(access_token));
+    const auth = chooseAuth(accessToken, import.meta.env.VITE_DEEPGRAM_KEY);
+    if (!auth) {
+      throw new Error(
+        "No Deepgram credential: the token endpoint is unavailable and " +
+          "VITE_DEEPGRAM_KEY is not set.",
+      );
+    }
+    if (auth.mode === "key") {
+      console.warn(
+        "Deepgram: using the API key from the browser. The backend could not " +
+          "mint a short-lived token — see README, Known tradeoffs.",
+      );
+    }
+
+    const socket = new WebSocket(DEEPGRAM_URL, auth.protocols);
     socketRef.current = socket;
 
     socket.onopen = () => {

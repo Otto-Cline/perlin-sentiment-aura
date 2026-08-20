@@ -37,6 +37,9 @@ curl -s http://localhost:8000/health
 `{"status":"ok","llm_configured":true,"transcription_configured":true}` means
 you're ready. Either flag reading `false` is why the aura looks washed out.
 
+For live mic, also copy `frontend/.env.example` to `frontend/.env`. See "Known
+tradeoffs" for why the Deepgram key currently has to sit there.
+
 Validate the Anthropic key and see per-call latency:
 
 ```bash
@@ -289,23 +292,37 @@ justified by the error-handling rubric line and by being the live-demo fallback.
 
 ## Known tradeoffs
 
-- **The Deepgram JWT WebSocket subprotocol is inferred, not documented.**
-  Browsers can't set WebSocket headers, so credentials ride
-  `Sec-WebSocket-Protocol`. Deepgram documents the API-key form as
-  `["token", KEY]` and documents the Bearer scheme for minted JWTs, but doesn't
-  show the JWT subprotocol array literally. This code uses
-  `["bearer", access_token]`. If the handshake fails with a valid token, switch
-  to the exported `keySubprotocol` in `frontend/src/state/useTranscription.ts`
-  and supply `VITE_DEEPGRAM_KEY` — that works, at the cost of exposing the key
-  to the browser.
-- **`ANTHROPIC_MODEL` defaults to `claude-opus-5`.** A real-time loop on a 5s
-  budget may want something faster; it's a one-line env change, and
-  `scripts/smoke_anthropic.py` prints per-call latency so the decision can be
-  made from data.
-- **The live audio path has not been executed.** No Deepgram or Anthropic key
-  was available while building. Every other path is verified; these two are
-  covered only at their fallback boundaries, which is why all their network code
-  sits in the three isolated files named above.
+- **The Deepgram key authenticates from the browser, not via a minted token.**
+  The intended design mints a short-lived token server-side so the key never
+  reaches the browser. The key supplied cannot do that — `POST /v1/auth/grant`
+  returns `FORBIDDEN / Insufficient permissions`, while `GET /v1/projects`
+  returns 200, so the key is valid but lacks token-grant permission. The app
+  therefore asks the backend for a token first and falls back to
+  `VITE_DEEPGRAM_KEY` when that fails, logging a console warning. Supplying a
+  token-capable key upgrades it automatically, no code change.
+- **The bearer subprotocol is still unverified.** Browsers can't set WebSocket
+  headers, so credentials ride `Sec-WebSocket-Protocol`. The key form
+  `["token", KEY]` is *verified working* — a handshake against Deepgram
+  negotiated protocol `"token"`. The minted-JWT form `["bearer", token]` could
+  not be exercised, since no token could be minted.
+- **Mic capture is the one path not executed.** The token endpoint, the socket
+  handshake, the backend and the LLM are all verified against live services.
+  Browser mic capture was not, because the available browser blocked
+  `getUserMedia`.
+- **Structured output constrains shape, not range.** The API rejects
+  `minimum`/`maximum` and `maxItems` in an `output_config.format` schema
+  (verified: *"For 'number' type, properties maximum, minimum are not
+  supported"*). Ranges are stated in the prompt and enforced by Pydantic, which
+  **clamps** rather than rejects — discarding a reading over a 1.02 would drop
+  the aura to neutral for a whole utterance. Malformed shapes and wrong types
+  are still rejected outright.
+- **`ANTHROPIC_MODEL` defaults to `claude-sonnet-5`, not Opus.** Measured on
+  this prompt, four utterances each: Opus 5 median 4.67s / max 5.88s, Sonnet 5
+  median 3.08s / max 3.20s, Haiku 4.5 median 2.15s but a 6.73s outlier. Opus
+  exceeded the original 5s budget, so the timeout is now 8s and the default is
+  Sonnet. Haiku also rejects `output_config.effort` outright, so effort is sent
+  only to models that accept it. `scripts/smoke_anthropic.py` prints per-call
+  latency if you want to re-decide.
 - **No component-level React tests.** The state coordination between
   `useTranscription` and `App` was verified in a browser rather than with a
   testing library. Pure logic is unit-tested; rendering is not.
