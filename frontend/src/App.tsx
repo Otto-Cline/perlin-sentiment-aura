@@ -4,6 +4,8 @@ import { TranscriptDisplay } from "./ui/TranscriptDisplay";
 import { useAnalysis } from "./state/useAnalysis";
 import { createDemoDriver } from "./demo/driver";
 import { Aura } from "./aura/Aura";
+import { KeywordsDisplay } from "./ui/KeywordsDisplay";
+import { useKeywordCloud } from "./state/useKeywordCloud";
 import type { Analysis, ConnectionState, SourceMode } from "./types";
 import "./styles.css";
 
@@ -15,6 +17,7 @@ export default function App() {
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [lines, setLines] = useState<string[]>([]);
   const { analysis, analysisRef, submit, apply, lastError } = useAnalysis();
+  const keywords = useKeywordCloud(analysis.keywords);
 
   const onDemoUpdate = useCallback(
     (next: Analysis, line: string) => {
@@ -69,7 +72,8 @@ export default function App() {
     <div className="app">
       <Aura analysisRef={analysisRef} connection={connection} />
       <TranscriptDisplay lines={lines} interim="" />
-      <pre className="debug">{JSON.stringify(analysis, null, 2)}</pre>
+      <KeywordsDisplay keywords={keywords} />
+      {analysis.rationale && <p className="rationale">{analysis.rationale}</p>}
       {lastError && <p className="error">{lastError}</p>}
       <Controls
         recording={recording}
