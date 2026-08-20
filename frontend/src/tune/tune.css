@@ -1,0 +1,159 @@
+:root {
+  --ink: #1b1a17;
+  --graphite: #6d6a62;
+  --rule: #d5cfc2;
+  --panel: rgba(247, 246, 242, 0.94);
+  --font-instrument: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #e9eae9;
+  color: var(--ink);
+  font-family: var(--font-instrument);
+  font-size: 12px;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+}
+
+#stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 306px;
+  padding: 18px 20px 24px;
+  overflow-y: auto;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  border-left: 1px solid var(--rule);
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hint {
+  margin: 0 0 18px;
+  color: var(--graphite);
+  line-height: 1.5;
+  font-size: 11px;
+}
+
+fieldset {
+  margin: 0 0 16px;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+legend {
+  padding: 0 6px 0 0;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--graphite);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin-bottom: 9px;
+}
+
+.row label {
+  font-size: 11px;
+}
+
+.row output {
+  font-variant-numeric: tabular-nums;
+  color: var(--graphite);
+}
+
+.row input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+  font-size: 11px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+button {
+  flex: 1;
+  padding: 9px 10px;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f4f2ed;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+button.secondary {
+  color: var(--ink);
+  background: transparent;
+}
+
+.readout {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  color: var(--graphite);
+  line-height: 1.7;
+}
+
+.readout b {
+  color: var(--ink);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+#dump {
+  width: 100%;
+  height: 120px;
+  margin-top: 10px;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  resize: vertical;
+}
