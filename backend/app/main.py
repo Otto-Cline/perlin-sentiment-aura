@@ -1,11 +1,15 @@
-"""FastAPI proxy. Task 1 returns a hardcoded analysis; Task 6 swaps in the LLM."""
+"""FastAPI proxy: receives text, gets it scored, returns validated JSON."""
 
 import os
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .schemas import Analysis, ProcessTextRequest, ProcessTextResponse
+load_dotenv()
+
+from .analyzer import analyze  # noqa: E402  (must follow load_dotenv)
+from .schemas import ProcessTextRequest, ProcessTextResponse  # noqa: E402
 
 app = FastAPI(title="Sentiment Aura")
 
@@ -17,27 +21,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Step 1 stand-in. Deliberately not neutral, so the frontend wiring in Task 2
-# visibly moves off its defaults.
-HARDCODED = Analysis(
-    valence=0.62,
-    arousal=0.55,
-    speaker_certainty=0.78,
-    model_confidence=0.85,
-    keywords=[
-        {"text": "prototype", "weight": 0.9},
-        {"text": "shipping", "weight": 0.6},
-        {"text": "tomorrow", "weight": 0.4},
-    ],
-    rationale="Hardcoded sample analysis.",
-)
-
-
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, object]:
+    # The configured flags make "why is the aura always neutral?" a one-request
+    # question instead of a log hunt.
+    return {
+        "status": "ok",
+        "llm_configured": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "transcription_configured": bool(os.environ.get("DEEPGRAM_API_KEY")),
+    }
 
 
 @app.post("/process_text", response_model=ProcessTextResponse)
 async def process_text(req: ProcessTextRequest) -> ProcessTextResponse:
-    return ProcessTextResponse(seq=req.seq, analysis=HARDCODED)
+    analysis = await analyze(req.utterances)
+    return ProcessTextResponse(seq=req.seq, analysis=analysis)
