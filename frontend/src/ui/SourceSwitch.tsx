@@ -9,7 +9,6 @@ interface Props {
 /** Named for what the user gets, not for how it's wired. */
 const MODES: SegmentOption<SourceMode>[] = [
   { value: "demo", label: "Demo" },
-  { value: "hardcoded", label: "Sample" },
   { value: "live", label: "Live mic" },
 ];
 

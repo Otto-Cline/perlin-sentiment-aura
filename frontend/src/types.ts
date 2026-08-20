@@ -22,7 +22,7 @@ export const NEUTRAL_ANALYSIS: Analysis = {
   rationale: "",
 };
 
-export type SourceMode = "demo" | "hardcoded" | "live";
+export type SourceMode = "demo" | "live";
 
 export type ConnectionState =
   | "idle"

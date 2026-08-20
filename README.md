@@ -46,15 +46,14 @@ Validate the Anthropic key and see per-call latency:
 cd backend && uv run python scripts/smoke_anthropic.py
 ```
 
-## The three source modes
+## The two source modes
 
-The dropdown in the bottom-left switches where analysis comes from. All three
-feed the identical downstream pipeline.
+The switch in the bottom-left chooses where analysis comes from. Both feed the
+identical downstream pipeline.
 
 | Mode | Transcript | Analysis | Needs |
 |---|---|---|---|
 | **Demo** | scripted six-line arc | scripted, on a 3.2s timer | nothing — no mic, no network |
-| **Sample** | one fixed sample line | real `/process_text` → Claude | Anthropic key |
 | **Live mic** | real Deepgram stream | real `/process_text` → Claude | both keys |
 
 Demo mode is the fallback if the mic or the network fails during a live demo,

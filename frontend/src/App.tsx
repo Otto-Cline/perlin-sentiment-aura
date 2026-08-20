@@ -16,12 +16,9 @@ import type {
 } from "./types";
 import "./styles.css";
 
-const SAMPLE = "I think this is going to work really well";
-
 // An empty panel is an invitation to act, so it says what to do next.
 const PLACEHOLDER: Record<SourceMode, string> = {
   demo: "Press Start to play the scripted demo.",
-  hardcoded: "Press Start to score one sample line.",
   live: "Press Start, allow the microphone, then speak.",
 };
 
@@ -103,17 +100,11 @@ export default function App() {
       driverRef.current.start();
       return;
     }
-    if (source === "hardcoded") {
-      setConnection("live");
-      setLines((prev) => [...prev, SAMPLE]);
-      await submit([SAMPLE]);
-      return;
-    }
     // A failed start leaves connection in `error`; recording must follow or the
     // button says "Stop" while nothing is running.
     const started = await transcription.start();
     if (!started) setRecording(false);
-  }, [source, submit, transcription]);
+  }, [source, transcription]);
 
   const toggle = () => (recording ? stop() : void start());
 
