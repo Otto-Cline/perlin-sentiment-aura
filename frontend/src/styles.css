@@ -15,6 +15,9 @@ body {
 
 .app { position: relative; height: 100vh; }
 
+.aura { position: fixed; inset: 0; z-index: 0; }
+.transcript, .debug, .controls, .error { z-index: 1; }
+
 .transcript,
 .debug,
 .controls {

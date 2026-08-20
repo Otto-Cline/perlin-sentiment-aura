@@ -3,6 +3,7 @@ import { Controls } from "./ui/Controls";
 import { TranscriptDisplay } from "./ui/TranscriptDisplay";
 import { useAnalysis } from "./state/useAnalysis";
 import { createDemoDriver } from "./demo/driver";
+import { Aura } from "./aura/Aura";
 import type { Analysis, ConnectionState, SourceMode } from "./types";
 import "./styles.css";
 
@@ -13,7 +14,7 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [lines, setLines] = useState<string[]>([]);
-  const { analysis, submit, apply, lastError } = useAnalysis();
+  const { analysis, analysisRef, submit, apply, lastError } = useAnalysis();
 
   const onDemoUpdate = useCallback(
     (next: Analysis, line: string) => {
@@ -66,6 +67,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <Aura analysisRef={analysisRef} connection={connection} />
       <TranscriptDisplay lines={lines} interim="" />
       <pre className="debug">{JSON.stringify(analysis, null, 2)}</pre>
       {lastError && <p className="error">{lastError}</p>}
