@@ -17,69 +17,85 @@ interface ScriptEntry {
  * noise means the visualization can be tuned against repeatable input, and the
  * live demo has a predictable shape.
  */
+/**
+ * Scripted emotional arc, written to exercise the channels that actually drive
+ * the visual: valence as turn sharpness, arousal as speed and nib width, and
+ * model_confidence as opacity.
+ *
+ * It walks the corners deliberately — smooth and broad, then jagged and fast,
+ * then jagged and slow, then a near-invisible ghost, then resolution — because
+ * a subtle arc reads as one continuous texture. `speaker_certainty` is still
+ * populated for schema fidelity but no longer drives anything.
+ */
 const SCRIPT: ScriptEntry[] = [
   {
-    line: "So, um, I guess we could try the new approach.",
-    valence: 0.05,
-    arousal: 0.2,
-    speaker_certainty: 0.15,
-    model_confidence: 0.45,
-    rationale: "Heavy hedging, low energy.",
-    kw: [["approach", 0.5]],
-  },
-  {
-    line: "Actually, the numbers came back and they look strong.",
-    valence: 0.55,
-    arousal: 0.45,
-    speaker_certainty: 0.7,
-    model_confidence: 0.8,
-    rationale: "Positive shift, assertive.",
+    line: "Okay, the migration finished and everything came back clean.",
+    valence: 0.6,
+    arousal: 0.55,
+    speaker_certainty: 0.8,
+    model_confidence: 0.85,
+    rationale: "Calm relief, assured.",
     kw: [
-      ["numbers", 0.8],
-      ["strong", 0.7],
+      ["migration", 0.85],
+      ["clean", 0.7],
     ],
   },
   {
-    line: "This is exactly what we needed. It works.",
-    valence: 0.9,
-    arousal: 0.8,
+    line: "This is exactly what we wanted. The numbers are up across the board!",
+    valence: 0.95,
+    arousal: 0.92,
+    speaker_certainty: 0.95,
+    model_confidence: 0.92,
+    rationale: "Elated and emphatic — broad, sweeping marks.",
+    kw: [
+      ["numbers", 0.95],
+      ["board", 0.45],
+    ],
+  },
+  {
+    line: "Wait. Wait. The whole payment service just fell over.",
+    valence: -0.85,
+    arousal: 0.95,
+    speaker_certainty: 0.9,
+    model_confidence: 0.9,
+    rationale: "Alarm — sharp turns at speed.",
+    kw: [
+      ["payment", 0.95],
+      ["fell", 0.8],
+    ],
+  },
+  {
+    line: "I don't know. Nothing in the logs explains any of it.",
+    valence: -0.45,
+    arousal: 0.25,
+    speaker_certainty: 0.3,
+    model_confidence: 0.72,
+    rationale: "Deflated and stuck — jagged but slow.",
+    kw: [
+      ["logs", 0.75],
+      ["explains", 0.5],
+    ],
+  },
+  {
+    line: "Um, yeah, so, anyway. Standup is at ten I think.",
+    valence: 0.0,
+    arousal: 0.15,
+    speaker_certainty: 0.2,
+    model_confidence: 0.08,
+    rationale: "Logistics filler — almost no emotional signal to read.",
+    kw: [["standup", 0.3]],
+  },
+  {
+    line: "Found it. One config flag. We are back up.",
+    valence: 0.8,
+    arousal: 0.75,
     speaker_certainty: 0.95,
     model_confidence: 0.9,
-    rationale: "Emphatic and certain.",
+    rationale: "Resolved, decisive.",
     kw: [
-      ["works", 0.95],
-      ["needed", 0.6],
+      ["config", 0.85],
+      ["back", 0.6],
     ],
-  },
-  {
-    line: "Wait. The deployment failed again.",
-    valence: -0.7,
-    arousal: 0.85,
-    speaker_certainty: 0.85,
-    model_confidence: 0.88,
-    rationale: "Sharp negative turn, high activation.",
-    kw: [
-      ["deployment", 0.9],
-      ["failed", 0.85],
-    ],
-  },
-  {
-    line: "Okay. Okay. Let me look at the logs.",
-    valence: -0.15,
-    arousal: 0.35,
-    speaker_certainty: 0.6,
-    model_confidence: 0.55,
-    rationale: "Settling, recovering composure.",
-    kw: [["logs", 0.6]],
-  },
-  {
-    line: "Yeah so anyway the meeting is at four.",
-    valence: 0.0,
-    arousal: 0.2,
-    speaker_certainty: 0.5,
-    model_confidence: 0.12,
-    rationale: "Logistics chatter, little emotional signal.",
-    kw: [["meeting", 0.3]],
   },
 ];
 

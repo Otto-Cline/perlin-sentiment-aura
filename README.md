@@ -49,11 +49,26 @@ feed the identical downstream pipeline.
 | Mode | Transcript | Analysis | Needs |
 |---|---|---|---|
 | **Demo** | scripted six-line arc | scripted, on a 3.2s timer | nothing — no mic, no network |
+
 | **Sample** | one fixed sample line | real `/process_text` → Claude | Anthropic key |
 | **Live mic** | real Deepgram stream | real `/process_text` → Claude | both keys |
 
 Demo mode is the fallback if the mic or the network fails during a live demo,
 and it is the mode the visualization was tuned against.
+
+Its six lines are written to exercise the channels that actually drive the
+marker, because a subtle arc reads as one continuous texture. It walks the
+corners on purpose: calm-positive (smooth, broad), elated (fast, sweeping),
+alarm (jagged at speed), deflated (jagged but slow), logistics filler at 0.08
+confidence (a near-invisible ghost mark), then resolution. High arousal is
+deliberately paired with both a positive and a negative reading, so arousal and
+valence read as independent rather than correlated. Tests assert each of those
+spans, so a later edit cannot quietly flatten the demo.
+
+**Keywords are never written behind the UI.** Candidate positions overlapping
+the transcript panel, the controls or the rationale are rejected at placement.
+The rects are measured from the DOM at placement time rather than hard-coded,
+since the transcript panel grows as lines arrive and the layout is responsive.
 
 ## Architecture
 
@@ -216,6 +231,12 @@ Measured on the demo script, marked page area:
 The shipped value is deliberately slow: the page becomes largely marked over a
 few minutes, which is the point — a document that gets progressively
 highlighted. Set `0.003` for a mostly-clear page that holds indefinitely.
+
+Note the interaction with demo mode. The demo script averages higher arousal
+than it used to, precisely so the speed and width channels show themselves — and
+arousal is half the deposit term. Measured: one full pass of the script reaches
+**82% marked in about 24 seconds**. If that is too fast, the fade rate is the
+dial; the demo is doing its job.
 
 These figures come from stepping frames while wall-clock time advances. An
 earlier set was measured by driving frames synchronously, which froze the demo's

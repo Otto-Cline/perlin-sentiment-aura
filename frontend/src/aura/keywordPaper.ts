@@ -58,12 +58,45 @@ export function sizeForWeight(weight: number): number {
   );
 }
 
+/** A region of the canvas the UI already occupies. */
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Clearance kept between a word and a reserved panel. */
+const RESERVED_PAD = 10;
+
+function intersectsReserved(
+  cx: number,
+  cy: number,
+  halfW: number,
+  halfH: number,
+  reserved: Rect[],
+): boolean {
+  for (const r of reserved) {
+    if (
+      cx + halfW > r.x - RESERVED_PAD &&
+      cx - halfW < r.x + r.width + RESERVED_PAD &&
+      cy + halfH > r.y - RESERVED_PAD &&
+      cy - halfH < r.y + r.height + RESERVED_PAD
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
- * Picks the least crowded of several candidate positions.
+ * Picks the least crowded of several candidate positions, avoiding regions the
+ * UI covers.
  *
  * Purely random placement collides and reads as a mess; this keeps the page
- * looking composed without arranging it into a grid. `rand` is injected so the
- * behaviour is testable.
+ * looking composed without arranging it into a grid. Candidates overlapping a
+ * reserved rect are rejected outright — a word behind the transcript panel is
+ * simply lost. `rand` is injected so the behaviour is testable.
  */
 export function placeKeyword(
   existing: PlacedKeyword[],
@@ -71,28 +104,46 @@ export function placeKeyword(
   width: number,
   height: number,
   now: number,
+  reserved: Rect[] = [],
   rand: () => number = Math.random,
 ): PlacedKeyword {
   const size = sizeForWeight(keyword.weight);
   // Rough text extent, enough for spacing decisions.
   const halfW = (keyword.text.length * size * 0.3) / 2;
+  const halfH = size * 0.6;
   const marginX = Math.min(width / 2 - 1, halfW + 24);
   const marginY = Math.min(height / 2 - 1, size + 24);
 
-  let best = { x: width / 2, y: height / 2, clearance: -1 };
+  const candidate = () => ({
+    x: marginX + rand() * Math.max(1, width - marginX * 2),
+    y: marginY + rand() * Math.max(1, height - marginY * 2),
+  });
 
-  for (let i = 0; i < HIGHLIGHTER.placementTries; i++) {
-    const x = marginX + rand() * Math.max(1, width - marginX * 2);
-    const y = marginY + rand() * Math.max(1, height - marginY * 2);
+  let best = { x: width / 2, y: height / 2, clearance: -1 };
+  let bestBlocked = { x: width / 2, y: height / 2, clearance: -1 };
+
+  // Extra tries when panels are reserved, since some candidates are discarded.
+  const tries = HIGHLIGHTER.placementTries * (reserved.length ? 3 : 1);
+
+  for (let i = 0; i < tries; i++) {
+    const { x, y } = candidate();
 
     let clearance = Infinity;
     for (const other of existing) {
-      const dx = other.x - x;
-      const dy = other.y - y;
-      clearance = Math.min(clearance, Math.hypot(dx, dy));
+      clearance = Math.min(clearance, Math.hypot(other.x - x, other.y - y));
+    }
+
+    if (intersectsReserved(x, y, halfW, halfH, reserved)) {
+      // Kept only as a last resort if every candidate lands on a panel.
+      if (clearance > bestBlocked.clearance) {
+        bestBlocked = { x, y, clearance };
+      }
+      continue;
     }
     if (clearance > best.clearance) best = { x, y, clearance };
   }
+
+  if (best.clearance < 0) best = bestBlocked;
 
   return {
     text: keyword.text,
@@ -112,6 +163,7 @@ export function mergePlaced(
   width: number,
   height: number,
   now: number,
+  reserved: Rect[] = [],
   rand: () => number = Math.random,
 ): PlacedKeyword[] {
   let next = [...existing];
@@ -128,7 +180,7 @@ export function mergePlaced(
       };
       continue;
     }
-    next.push(placeKeyword(next, keyword, width, height, now, rand));
+    next.push(placeKeyword(next, keyword, width, height, now, reserved, rand));
   }
 
   if (next.length > HIGHLIGHTER.maxKeywords) {

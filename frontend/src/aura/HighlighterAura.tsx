@@ -8,6 +8,7 @@ import {
   createKeywordLayer,
   mergePlaced,
   type PlacedKeyword,
+  type Rect,
 } from "./keywordPaper";
 import { mapHighlighter } from "./highlighterMapping";
 import { HIGHLIGHTER } from "./preset";
@@ -23,6 +24,26 @@ interface Props {
 /** Same per-frame easing as before. Nothing snaps. */
 const EASING = 0.04;
 const FADE_BITE = 0.004;
+
+/** UI that words must not be written behind. */
+const RESERVED_SELECTOR = ".transcript, .controls, .rationale";
+
+/**
+ * Regions the UI currently covers, in canvas coordinates.
+ *
+ * Measured from the DOM rather than hard-coded: the transcript panel grows as
+ * lines arrive, and the layout is responsive. The canvas is fixed at inset 0 at
+ * pixelDensity 1, so client coordinates are canvas coordinates.
+ *
+ * Read only when words are placed, which is once per analysis update — cheap
+ * enough, and it always reflects the panel's current height.
+ */
+function reservedRects(): Rect[] {
+  return Array.from(document.querySelectorAll(RESERVED_SELECTOR)).map((el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left, y: r.top, width: r.width, height: r.height };
+  });
+}
 
 /**
  * Composites the three layers: crinkled paper, then the page's words, then the
@@ -97,7 +118,14 @@ export function HighlighterAura({
         if (incoming && incoming !== seenKeywords) {
           seenKeywords = incoming;
           if (incoming.length > 0) {
-            placed = mergePlaced(placed, incoming, p.width, p.height, now);
+            placed = mergePlaced(
+              placed,
+              incoming,
+              p.width,
+              p.height,
+              now,
+              reservedRects(),
+            );
           }
         }
 

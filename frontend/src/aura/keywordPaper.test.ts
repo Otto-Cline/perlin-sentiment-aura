@@ -57,9 +57,57 @@ describe("placeKeyword", () => {
       W,
       H,
       0,
+      [],
       rand,
     );
     expect(Math.hypot(placed.x - 100, placed.y - 100)).toBeGreaterThan(200);
+  });
+
+  it("never writes a word inside a reserved panel", () => {
+    // A word behind the transcript panel is simply lost.
+    const panel = { x: 40, y: 500, width: 420, height: 260 };
+    for (let i = 0; i < 200; i++) {
+      const p = placeKeyword([], { text: "deployment", weight: 0.9 }, W, H, 0, [
+        panel,
+      ]);
+      const insideX = p.x > panel.x && p.x < panel.x + panel.width;
+      const insideY = p.y > panel.y && p.y < panel.y + panel.height;
+      expect(insideX && insideY).toBe(false);
+    }
+  });
+
+  it("avoids several reserved panels at once", () => {
+    const panels = [
+      { x: 40, y: 500, width: 420, height: 260 },
+      { x: 40, y: 40, width: 300, height: 80 },
+    ];
+    for (let i = 0; i < 200; i++) {
+      const p = placeKeyword([], { text: "logs", weight: 0.5 }, W, H, 0, panels);
+      for (const r of panels) {
+        const inside =
+          p.x > r.x && p.x < r.x + r.width && p.y > r.y && p.y < r.y + r.height;
+        expect(inside).toBe(false);
+      }
+    }
+  });
+
+  it("still returns a position when panels cover the whole page", () => {
+    // Degenerate, but it must place the word rather than loop or return NaN.
+    const everything = [{ x: 0, y: 0, width: W, height: H }];
+    const p = placeKeyword([], { text: "x", weight: 0.5 }, W, H, 0, everything);
+    expect(Number.isFinite(p.x)).toBe(true);
+    expect(Number.isFinite(p.y)).toBe(true);
+  });
+
+  it("keeps reserved avoidance when merging", () => {
+    const panel = { x: 0, y: 0, width: W, height: H / 2 };
+    let placed = mergePlaced([], [], W, H, 0, [panel]);
+    for (let i = 0; i < 20; i++) {
+      placed = mergePlaced(placed, [{ text: `w${i}`, weight: 0.6 }], W, H, i, [
+        panel,
+      ]);
+    }
+    for (const p of placed) expect(p.y).toBeGreaterThan(H / 2 - 60);
   });
 
   it("does not crash on a tiny page", () => {
