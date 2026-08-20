@@ -39,8 +39,7 @@ interface Controls {
   turnSharpness: number;
   alpha: number;
   fadeRate: number;
-  hueCool: number;
-  hueWarm: number;
+  hue: number;
   saturation: number;
   lightness: number;
   gestureScale: number;
@@ -55,13 +54,12 @@ interface Controls {
 const controls: Controls = {
   crinkle: 0.5,
   grainScale: HIGHLIGHTER.grainScale,
-  thickness: 24,
-  speed: 3,
-  turnSharpness: 0.3,
-  alpha: 0.16,
+  thickness: 38,
+  speed: 5.8,
+  turnSharpness: 0.5,
+  alpha: 0.2,
   fadeRate: HIGHLIGHTER.fadeRate,
-  hueCool: HIGHLIGHTER.hueCool,
-  hueWarm: HIGHLIGHTER.hueWarm,
+  hue: HIGHLIGHTER.hue,
   saturation: HIGHLIGHTER.saturation,
   lightness: HIGHLIGHTER.lightness,
   gestureScale: HIGHLIGHTER.gestureScale,
@@ -85,14 +83,13 @@ const SLIDERS: {
   { key: "crinkle", label: "Crinkle depth", min: 0, max: 1, step: 0.01, group: "Paper" },
   { key: "grainScale", label: "Grain scale", min: 0.1, max: 2, step: 0.05, group: "Paper" },
   { key: "keywordCount", label: "Words on page", min: 0, max: 12, step: 1, group: "Paper" },
-  { key: "thickness", label: "Nib thickness", min: 4, max: 60, step: 1, group: "Marker" },
-  { key: "speed", label: "Stroke speed", min: 0.3, max: 10, step: 0.1, group: "Marker" },
+  { key: "thickness", label: "Nib thickness", min: 4, max: 90, step: 1, group: "Marker" },
+  { key: "speed", label: "Stroke speed", min: 0.3, max: 14, step: 0.1, group: "Marker" },
   { key: "turnSharpness", label: "Turn sharpness", min: 0, max: 1, step: 0.01, group: "Marker" },
-  { key: "alpha", label: "Stroke lightness", min: 0.02, max: 0.5, step: 0.005, group: "Marker", format: (v) => v.toFixed(3) },
-  { key: "fadeRate", label: "Fade rate", min: 0, max: 0.02, step: 0.0002, group: "Marker", format: (v) => v.toFixed(4) },
+  { key: "alpha", label: "Stroke opacity", min: 0.02, max: 0.6, step: 0.005, group: "Marker", format: (v) => v.toFixed(3) },
+  { key: "fadeRate", label: "Fade rate", min: 0, max: 0.008, step: 0.0001, group: "Marker", format: (v) => v.toFixed(4) },
   { key: "gestureScale", label: "Gesture scale", min: 0.1, max: 2, step: 0.05, group: "Marker" },
-  { key: "hueCool", label: "Hue — cool (negative)", min: 260, max: 340, step: 1, group: "Colour" },
-  { key: "hueWarm", label: "Hue — warm (positive)", min: 340, max: 400, step: 1, group: "Colour" },
+  { key: "hue", label: "Hue (fixed)", min: 280, max: 360, step: 1, group: "Colour" },
   { key: "saturation", label: "Saturation %", min: 40, max: 100, step: 1, group: "Colour" },
   { key: "lightness", label: "Lightness %", min: 40, max: 85, step: 1, group: "Colour" },
   { key: "valence", label: "valence", min: -1, max: 1, step: 0.01, group: "Sentiment" },
@@ -129,7 +126,7 @@ function targets() {
   if (!controls.driveFromSentiment) {
     const warmth = Math.min(1, Math.max(0, (controls.valence + 1) / 2));
     return {
-      hue: controls.hueCool + (controls.hueWarm - controls.hueCool) * warmth,
+      hue: controls.hue,
       saturation: controls.saturation,
       lightness: controls.lightness,
       alpha: controls.alpha,
@@ -141,21 +138,24 @@ function targets() {
     };
   }
 
-  // Mirrors highlighterMapping, but reading the sliders' hue anchors so the
-  // ramp can be tuned without editing the preset.
+  // Mirrors highlighterMapping: fixed colour, valence as gesture, certainty
+  // unmapped, confidence only on opacity.
   const v = Math.min(1, Math.max(-1, controls.valence));
   const eV = Math.sign(v) * Math.abs(v) ** 0.55;
-  const warmth = Math.min(1, Math.max(0, (eV + 1) / 2));
+  const pleasantness = Math.min(1, Math.max(0, (eV + 1) / 2));
   return {
-    hue: controls.hueCool + (controls.hueWarm - controls.hueCool) * warmth,
+    hue: controls.hue,
     saturation: controls.saturation,
     lightness: controls.lightness,
-    alpha: 0.04 + 0.2 * controls.confidence,
-    thickness: 13 + 21 * controls.arousal,
-    speed: 1.2 + 4.3 * controls.arousal,
-    turnSharpness: 1 - controls.certainty,
+    alpha: HIGHLIGHTER.alphaMin +
+      (HIGHLIGHTER.alphaMax - HIGHLIGHTER.alphaMin) * controls.confidence,
+    thickness: HIGHLIGHTER.thicknessMin +
+      (HIGHLIGHTER.thicknessMax - HIGHLIGHTER.thicknessMin) * controls.arousal,
+    speed: HIGHLIGHTER.speedMin +
+      (HIGHLIGHTER.speedMax - HIGHLIGHTER.speedMin) * controls.arousal,
+    turnSharpness: 1 - pleasantness,
     crinkle: controls.crinkle,
-    temperature: 0.35 + warmth * 0.4,
+    temperature: 0.35 + pleasantness * 0.4,
   };
 }
 
@@ -302,8 +302,9 @@ const sentimentToggle = document.createElement("label");
 sentimentToggle.className = "check";
 sentimentToggle.innerHTML =
   "<input type='checkbox' /> <span>Drive marker from sentiment " +
-  "<span style='color:var(--graphite)'>(thickness, speed, sharpness and " +
-  "lightness follow the four signals instead of their sliders)</span></span>";
+  "<span style='color:var(--graphite)'>(arousal sets thickness and speed, " +
+  "valence sets turn sharpness, confidence sets opacity; certainty is " +
+  "unmapped)</span></span>";
 groups.get("Sentiment")!.appendChild(sentimentToggle);
 sentimentToggle.querySelector("input")!.addEventListener("change", (e) => {
   controls.driveFromSentiment = (e.target as HTMLInputElement).checked;
@@ -344,8 +345,7 @@ function paintReadout() {
       speedAtMidArousal: controls.speed,
       alpha: controls.alpha,
       fadeRate: controls.fadeRate,
-      hueCool: controls.hueCool,
-      hueWarm: controls.hueWarm,
+      hue: controls.hue,
       saturation: controls.saturation,
       lightness: controls.lightness,
       gestureScale: controls.gestureScale,

@@ -29,12 +29,11 @@ const MAX_LUMINANCE_SWING = 0.11;
  * Converts the field gradient into a shade multiplier. Calibrated by measuring
  * rendered luminance rather than derived: the gradient's magnitude depends on
  * the grain scale and the finite-difference spacing, so the honest way to set
- * this is to render and measure. Measured peak-to-peak luminance swing at this
- * value: 3.2% at crinkle 0.25, 6.5% at 0.5, 9.6% at 0.75, 12.6% at 1.0 — so
- * even a fully worn sheet sits at the top of the intended 8-12% band rather
- * than past it. Re-measure if GRAIN_SCALE or SCALE_DIV changes.
+ * this is to render and measure. Raised past the original 8-12% target on
+ * request, so the surface is plainly visible rather than merely implied.
+ * Re-measure if GRAIN_SCALE or SCALE_DIV changes.
  */
-const SHADE_GAIN = 3.2;
+const SHADE_GAIN = 4.2;
 
 /** Light from the upper left, normalized. */
 const LIGHT_X = -0.7071;

@@ -155,27 +155,31 @@ errors, and nothing else competes.
 The through-line: four independent signals drive four independent visual
 channels, so a viewer reads them simultaneously without the channels colliding.
 
-Every marker channel is an intensity or a gesture, so valence — the one
-categorical signal — rides a narrow hue shift *inside the pink family* rather
-than a full colour ramp. It stays one marker, and the channel survives.
+**The pen never changes colour.** Hue and saturation are fixed, so the marker
+reads as one physical highlighter throughout. Sentiment changes how it moves and
+how heavily it marks, never what colour it is.
 
 | Signal | Marker parameter | Reasoning |
 |---|---|---|
-| valence | hue, cool violet-magenta → warm rose | Real highlighters span this range, so it reads as one pen. Pushing the warm anchor past ~355 turns it orange and it stops reading as pink at all. |
-| arousal | stroke speed and nib thickness | Energy is a fast, broad mark. Legible twice over. |
-| speaker_certainty | turn sharpness | A decisive speaker sweeps in long arcs; a hedging one wanders and jerks. Certainty is inverted into sharpness, so high certainty means a steady hand. |
-| model_confidence | stroke lightness | An unsure read barely marks the page. Capped well below opaque at every confidence — a solid marker would hide the words it is supposed to be marking. |
+| valence | turn sharpness | Something pleasant sweeps in long calm arcs; something unpleasant turns sharply and jerks. Eased, so a moderately negative reading already looks agitated rather than merely tilted. |
+| arousal | stroke speed and nib thickness | Energy is a fast, broad mark. Deliberately wide ranges — roughly 18× on speed and 3× on width — because narrow ones read as one continuous texture in motion. |
+| model_confidence | stroke opacity | The only thing confidence touches, and the only channel that changes the mark's weight. Capped well short of opaque at every setting: a solid marker would hide the words it is meant to be marking. |
 | keyword weight | size and darkness on the page | Important words are larger and sit heavier in the paper. |
 | cumulative arousal | paper crinkle depth | The only channel that records history rather than the present. |
 
-Two things are set on a curve rather than linearly: valence is eased before it
-crosses the hue ramp, and the nib deliberately *resists* the field. The field's
-heading spans two full turns, so a marker that tracks it closely writhes like a
-ribbon; resisting it is what makes a stroke read as a deliberate mark.
+`speaker_certainty` is deliberately unmapped. Three strong channels read better
+than four weak ones, and valence carries the gesture instead.
 
-Marks fade slowly, and that is arithmetic rather than preference: two 24px nibs
-travelling ~3px per frame lay down ~144 px² per frame, which covers a 1280×800
-page in about two and a half minutes. Without a fade the page goes solid pink.
+The nib deliberately *resists* the field. The field's heading spans two full
+turns, so a marker that tracks it closely writhes like a ribbon; resisting it is
+what makes a stroke read as a deliberate mark.
+
+Fade rate is a budget, not a preference — the nib deposits `speed × thickness`
+px² per frame, so persistence and coverage are the same dial seen twice.
+Measured on the demo script: at `0.0012` the marked area runs 27% at 10s, 61% at
+40s and 88% at 100s, saturating to solid pink; at `0.003` it settles near 10%
+and holds there past 220s. The shipped value is the slowest fade that reaches an
+equilibrium rather than filling the page.
 
 Two consequences worth pointing out in a demo. Because every parameter eases
 toward its target at a fixed fraction per frame, the trails record recent

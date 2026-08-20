@@ -1,16 +1,19 @@
 /**
  * Sentiment to highlighter.
  *
- * One translucent pink marker over a page of words. Every channel here is an
- * intensity or a gesture, so valence — the only categorical signal — rides a
- * narrow hue shift inside the pink family rather than a full colour ramp.
+ * One translucent pink marker over a page of words. The pen never changes
+ * colour: hue and saturation are fixed, and the only thing sentiment does to
+ * the ink itself is set how heavily it marks the page.
+ *
+ * `speaker_certainty` is deliberately unmapped. Valence carries the gesture
+ * instead, which keeps three strong channels rather than four weak ones.
  */
 
 import type { Analysis, ConnectionState } from "../types";
 import { HIGHLIGHTER } from "./preset";
 
 export interface HighlighterTargets {
-  /** Degrees, may exceed 360; the renderer wraps it. */
+  /** Degrees. Fixed by the preset — sentiment never changes the pen's colour. */
   hue: number;
   saturation: number;
   lightness: number;
@@ -56,15 +59,15 @@ export function mapHighlighter(
 
   const valence = clampSigned(a.valence);
   const eased = Math.sign(valence) * Math.abs(valence) ** VALENCE_EASE;
-  const warmth = clamp01((eased + 1) / 2);
+  const pleasantness = clamp01((eased + 1) / 2);
 
   const arousal = clamp01(a.arousal);
-  const certainty = clamp01(a.speaker_certainty);
   const confidence = clamp01(a.model_confidence);
 
   return {
-    // Cool violet-magenta through to warm coral. Still one pink marker.
-    hue: lerp(HIGHLIGHTER.hueCool, HIGHLIGHTER.hueWarm, warmth),
+    // Fixed. Only the connection state may drain the colour, and that is an
+    // error signal rather than sentiment.
+    hue: HIGHLIGHTER.hue,
     saturation: HIGHLIGHTER.saturation * damping.saturation,
     lightness: HIGHLIGHTER.lightness,
 
@@ -77,16 +80,18 @@ export function mapHighlighter(
       arousal,
     ),
 
-    // Conviction is a steady hand: a decisive speaker sweeps, a hedging one
-    // wanders and jerks. Inverted, so high certainty means low sharpness.
-    turnSharpness: 1 - certainty,
+    // Valence is the gesture. Something pleasant sweeps in long calm arcs;
+    // something unpleasant turns sharply and jerks. Eased, so a moderately
+    // negative reading already looks agitated rather than merely tilted.
+    turnSharpness: 1 - pleasantness,
 
-    // An unsure read barely marks the page.
+    // The only thing confidence touches. An unsure read barely marks the page.
     alpha: lerp(HIGHLIGHTER.alphaMin, HIGHLIGHTER.alphaMax, confidence),
 
     crinkle:
       HIGHLIGHTER.baselineCrinkle +
       (1 - HIGHLIGHTER.baselineCrinkle) * clamp01(wearCrinkle),
-    temperature: 0.35 + warmth * 0.4,
+    // Paper warmth still leans with valence; it is paper, not ink.
+    temperature: 0.35 + pleasantness * 0.4,
   };
 }
