@@ -3,114 +3,76 @@
 A live speech visualization. You talk; your words appear on screen, the key ones
 are written by hand onto a sheet of paper, and a pink highlighter sweeps across
 that page — its speed, width, opacity and gesture all driven by the emotional
-shape of what you said. Speech goes to Deepgram, finalized utterances go to a
-FastAPI backend, and Claude scores each one along four dimensions. The marker
-follows a Perlin field and never targets the words; whatever lies under it gets
-marked.
+shape of what you said.
 
-## Setup
+Speech goes to Deepgram, finalized utterances go to a FastAPI backend, and Claude
+scores each one. The marker follows a Perlin noise field and never targets the
+words; whatever lies under it gets marked.
 
-Requires Python 3.11+, Node 20+, and [uv](https://docs.astral.sh/uv/).
+## Running it
+
+Needs Python 3.11+, Node 20+, and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-cp .env.example .env
+cp .env.example .env                     # fill in ANTHROPIC_API_KEY and DEEPGRAM_API_KEY
+cp frontend/.env.example frontend/.env   # only needed for live mic — see tradeoffs
 ```
 
-Fill in `ANTHROPIC_API_KEY` and `DEEPGRAM_API_KEY`. Then, in one terminal:
+Backend, in one terminal:
 
 ```bash
 cd backend && uv sync && uv run uvicorn app.main:app --reload --port 8000
 ```
 
-And in another:
+Frontend, in another:
 
 ```bash
 cd frontend && npm install && npm run dev
 ```
 
-Open the URL Vite prints. Confirm both keys were picked up:
+Open the URL Vite prints. To check both keys were picked up:
 
 ```bash
 curl -s http://localhost:8000/health
 ```
 
 `{"status":"ok","llm_configured":true,"transcription_configured":true}` means
-you're ready. Either flag reading `false` is why the aura looks washed out.
+you're ready. Either flag reading `false` is why the marker looks washed out.
 
-For live mic, also copy `frontend/.env.example` to `frontend/.env`. See "Known
-tradeoffs" for why the Deepgram key currently has to sit there.
-
-Validate the Anthropic key and see per-call latency:
+To validate the Anthropic key and see per-call latency:
 
 ```bash
 cd backend && uv run python scripts/smoke_anthropic.py
 ```
 
-## The two source modes
+**Two modes**, chosen bottom-left. **Live mic** is the real thing. **Demo** plays
+a scripted six-line conversation with no microphone and no network — it drives
+every layer identically, and it's the fallback if the mic fails mid-demo.
 
-The switch in the bottom-left chooses where analysis comes from. Both feed the
-identical downstream pipeline.
-
-| Mode | Transcript | Analysis | Needs |
-|---|---|---|---|
-| **Demo** | scripted six-line arc | scripted, on a 3.2s timer | nothing — no mic, no network |
-| **Live mic** | real Deepgram stream | real `/process_text` → Claude | both keys |
-
-Demo mode is the fallback if the mic or the network fails during a live demo,
-and it is the mode the visualization was tuned against.
-
-Its six lines are written to exercise the channels that actually drive the
-marker, because a subtle arc reads as one continuous texture. It walks the
-corners on purpose: calm-positive (smooth, broad), elated (fast, sweeping),
-alarm (jagged at speed), deflated (jagged but slow), logistics filler at 0.08
-confidence (a near-invisible ghost mark), then resolution. High arousal is
-deliberately paired with both a positive and a negative reading, so arousal and
-valence read as independent rather than correlated. Tests assert each of those
-spans, so a later edit cannot quietly flatten the demo.
-
-**Keywords are never written behind the UI.** Candidate positions overlapping
-the transcript panel, the controls or the rationale are rejected at placement.
-The rects are measured from the DOM rather than hard-coded, since the layout is
-responsive.
-
-Two things made this harder than a bounding-box test. The transcript panel is
-bottom-anchored and **grows upward** as lines arrive, so reserving its current
-extent left words placed legally above it and swallowed a few seconds later —
-placement therefore reserves the panel at *full* capacity, extrapolating from the
-tallest existing line. And the word extent estimate was too narrow for
-handwriting, so a word's centre cleared the panel while its glyphs overhung into
-it. Both are covered by tests, including one that asserts the whole bounding box
-clears a panel rather than just the centre point.
-
-## Architecture
+## How it fits together
 
 ```
 mic
- └─ MediaRecorder (audio/webm;codecs=opus, start(250))
-     └─ WebSocket ──► Deepgram (smart_format, interim_results)
-         ├─ interim  ──► transcript UI (greyed, in progress)
-         └─ speech_final ──► transcript UI (committed)
-                          └─ POST /process_text { utterances: [last 3], seq: n }
-                              └─ backend ──► Claude (json_schema, 5s timeout)
-                                  └─ Analysis (Pydantic-validated)
-                                      └─ drop if seq <= last applied
-                                          ├─ React state ──► transcript, keywords
-                                          └─ useRef ──► sketch targets ──► per-frame lerp
+ └─ MediaRecorder ──► WebSocket ──► Deepgram
+      ├─ interim results ──────────► transcript, greyed
+      └─ speech_final ────────────► POST /process_text { utterances: [last 3], seq }
+                                      └─ FastAPI ──► Claude (JSON schema, 8s timeout)
+                                          └─ Pydantic-validated Analysis
+                                              └─ drop if seq <= last applied
+                                                  ├─ React state ─► transcript, keywords
+                                                  └─ useRef ─────► canvas, read per frame
 ```
 
-The backend hosts no models. It holds the API keys, calls Claude, validates the
-response, and hands back clean JSON.
+The backend hosts no models. It holds the Anthropic key, calls Claude, validates
+the response, and returns clean JSON. All network I/O lives in three files —
+`backend/app/analyzer.py`, `backend/app/deepgram_token.py` and
+`frontend/src/state/useTranscription.ts` — and each degrades to a defined
+fallback rather than throwing.
 
-Three files own all network I/O — `backend/app/analyzer.py`,
-`backend/app/deepgram_token.py`, and `frontend/src/state/useTranscription.ts` —
-and each degrades to a defined fallback rather than throwing.
+A rolling window of the last three utterances is sent, not just the newest;
+scoring one at a time makes the values thrash on filler words.
 
-### Why the analysis is four numbers, not one
-
-The brief's example passes a single `sentiment` scalar. One number cannot drive a
-rich visualization, and "map abstract data to *multiple* visual parameters" is on
-the rubric, so the schema carries four independent signals plus weighted
-keywords:
+## What the model returns
 
 ```json
 {
@@ -123,256 +85,115 @@ keywords:
 }
 ```
 
+The brief's example passes a single `sentiment` scalar, and the section it points
+to for the schema contains neither a prompt nor a schema — so this is the
+project's own definition. One number can't drive a rich visualization.
+
 `valence` is pleasantness. `arousal` is energy, independent of valence — calm
-contentment is high valence and low arousal. `speaker_certainty` is hedging
-versus assertion. `model_confidence` is the model's certainty in its *own* read.
+contentment is high valence, low arousal. `model_confidence` is the model's
+certainty in its *own* read: sarcasm, filler and one-word utterances score low.
 
-A rolling window of the last three utterances is sent, not just the newest;
-scoring one utterance at a time makes the values thrash on filler words.
+## Sentiment → visual
 
-## Why this sentiment → visual mapping
+**The pen never changes colour.** Hue and saturation are fixed, so it reads as one
+physical highlighter throughout. Sentiment changes how it *moves* and how heavily
+it marks, never what colour it is — a channel given up deliberately to keep the
+object believable.
 
-### The visualization
-
-Three layers, back to front:
-
-1. **Paper** — a crinkled surface, shaded from the noise field.
-2. **Keywords** — the model's keywords written onto the page as they arrive,
-   sized and darkened by weight, and left there. Each word is set in handwriting
-   from the system font stack, tilted slightly off level, and *written on* left
-   to right behind a growing clip rectangle. True stroke-by-stroke handwriting
-   would need per-glyph path data; a left-to-right reveal is the same gesture
-   for a fraction of the cost.
-3. **Highlighter** — one translucent pink marker tracing the field.
-
-**Getting the marker to look like it is on top took three passes, not one.**
-`multiply` alone tints the paper like ink but leaves dark pixels untouched —
-`multiply(pink, black)` is black — so a marker crossing a word had literally no
-effect on it and the word read as sitting above the ink. So:
-
-- the words render to their own layer, and the marker is used as a
-  `destination-out` eraser on that layer, lowering the words' own opacity in
-  proportion to the marker's alpha (measured: text under a mark sits ~33 luma
-  lighter than bare text, against ~7 for a veil alone);
-- the marker then composites over the page with `multiply` for the paper tint;
-- followed by a lighter normal-blend pass to veil what it crosses.
-
-The knockdown is capped below full, so a heavily marked passage stays legible
-instead of disappearing.
-
-**The marker never targets the words.** The Perlin field is the only thing
-steering it; whichever keywords happen to lie under the path get marked. That
-keeps the field the sole driver, which is both the brief's requirement and the
-reason the composition stays unpredictable.
-
-`field()` and `angleAt()` in `aura/field.ts` are the single source of noise.
-Paper grain and pen gesture call the *same function with the same seed* at
-different input multipliers — grain at ~18× the gesture scale — so the paper
-bulges where the pen curves. That correlation is deliberate; a second seed would
-destroy it.
-
-**Paper wear is cumulative and never resets.** Each analysis update adds
-`arousal² × 0.11` to a monotonic accumulator that drives crinkle depth. A calm
-conversation stays smooth; a long intense one leaves a permanently worn surface
-that stays worn after things settle. Only an explicit reset lowers it — the
-value is a getter over a private field, so an assignment throws rather than
-silently succeeding.
-
-Arousal is squared, and the rate was set from the demo's real cadence rather
-than picked: at one utterance every 3.2s the surface reaches full depth in
-around 65 seconds of energetic speech, while quiet speech would take over twenty
-minutes. A linear scale could not do both — fast enough to see inside a demo
-also meant calm speech wearing the page, and the original rate needed nine
-minutes of shouting before the surface moved at all. Measured bare-paper
-contrast over a demo: 5.9% fresh, 21.5% after twenty seconds.
-
-### Visual direction
-
-A marked-up page, not an instrument readout. The canvas is paper: an off-white
-sheet with a visible tooth, handwritten keywords, and one translucent pink
-marker over them. The interface around it is deliberately the opposite — a clean
-grotesque in small caps, so crisp UI reads against handwritten content. Three
-type roles, all from system stacks so no webfont can fail mid-demo: handwriting
-for the page's words, a serif for transcript prose, a grotesque for chrome. The
-only saturated colour anywhere is the marker; a single oxblood is reserved for
-recording and errors.
-
-| Signal | Marker parameter | Reasoning |
+| signal | what it drives | why |
 |---|---|---|
-| valence | turn sharpness | Something pleasant sweeps in long calm arcs; something unpleasant turns sharply and jerks. Eased, so a moderately negative reading already looks agitated rather than merely tilted. |
-| arousal | stroke speed and nib thickness | Energy is a fast, broad mark. Deliberately wide ranges — roughly 18× on speed and 9× on width — because narrow ones read as one continuous texture in motion. Width is also *curved* (exponent 1.7) rather than linear: linearly, ordinary mid-range speech already drew a broad band and the thin end never appeared, so the page was almost always thick lines. Curved, a broad nib is reserved for genuinely loud moments. |
-| model_confidence | stroke opacity | The only thing confidence touches, and the only channel that changes the mark's weight. Capped well short of opaque at every setting: a solid marker would hide the words it is meant to be marking. |
-| keyword weight | size and darkness on the page | Important words are larger and sit heavier in the paper. |
-| cumulative arousal | paper crinkle depth | The only channel that records history rather than the present. |
+| valence | turn sharpness | pleasant sweeps in long calm arcs; unpleasant turns sharply and jerks |
+| arousal | speed and nib width | energy is a fast, broad mark — legible twice over |
+| model_confidence | opacity | an unsure read barely marks the page; capped short of opaque so words stay readable |
+| keyword weight | size and darkness | important words are larger and sit heavier |
+| *cumulative* arousal | paper crinkle depth | the only channel that records history rather than the present |
 
-`speaker_certainty` is deliberately unmapped. Three strong channels read better
+`speaker_certainty` is deliberately unmapped — three strong channels read better
 than four weak ones, and valence carries the gesture instead.
 
-The nib deliberately *resists* the field. The field's heading spans two full
-turns, so a marker that tracks it closely writhes like a ribbon; resisting it is
-what makes a stroke read as a deliberate mark.
+**Paper wear never resets.** Each reading adds `arousal² × 0.11` to a monotonic
+accumulator. A calm conversation stays smooth; a loud one crumples the sheet and
+it stays crumpled after things settle. Only an explicit reset lowers it — the
+value is a getter over a private field, so an assignment throws.
 
-A fading mark changes only its opacity, never its colour. Getting that required
-drawing the marker as **filled swept quads** rather than stroked lines: round or
-square line caps extend past each frame's endpoint and overlap the previous
-mark, compounding alpha until a fresh stroke goes dark crimson while faded ones
-stay pale, which reads as the hue shifting. Butt caps stop the overlap but leave
-wedge gaps on the outside of every turn, striping the stroke like corduroy.
-Filling the exact area the nib swept — previous heading at the back edge,
-current heading at the front — has neither problem. The paper is also kept near
-neutral, since a translucent pink fading toward a cream background mixes toward
-that warmth.
+## The Perlin field
 
-Fade rate is a budget, not a preference — the nib deposits `speed × thickness`
-px² per frame, so persistence and coverage are the same dial seen twice.
-Measured on the demo script, marked page area:
+`field()` and `angleAt()` in `frontend/src/aura/field.ts` are the only source of
+noise in the app. Every point on the canvas has a direction; the marker asks
+"which way at my position?" each frame and steps, so its path is a single flow
+line through the field. The usual way to show a flow field is hundreds of thin
+particles — this is one thick pen instead.
 
-| fadeRate | behaviour |
-|---|---|
-| `0.003` | ~10%, stable from 40s out past 220s |
-| `0.001` | 51% at 22s, 72% at 44s — still climbing |
-| `0.001` (shipped) | ~63% after a full pass of the demo script (~20s) |
+The paper is the *same function at eighteen times the zoom*, shaded by finite
+differences and lit from the upper left, so the grain you can see is the field
+itself. One seed, two scales; a second seed would destroy the correlation.
 
-The shipped value is deliberately slow: the page becomes largely marked over a
-few minutes, which is the point — a document that gets progressively
-highlighted. Set `0.003` for a mostly-clear page that holds indefinitely.
+The marker also deliberately *resists* the field. Tracking it exactly makes the
+stroke writhe like a ribbon; resisting it is what makes a mark read as deliberate.
 
-Note the interaction with demo mode. The demo script averages higher arousal
-than it used to, precisely so the speed and width channels show themselves — and
-arousal is half the deposit term. Measured around the script's loudest passage,
-the page reaches **~82% marked within 15 seconds**. Coverage readings therefore
-depend on where in the script they are taken, since arousal varies by line.
+Layers go paper → words → marker, composited with `multiply` so the words read
+through the ink. Because `multiply(pink, black)` is black, the marker alone had no
+effect on the words it crossed — so the words render to their own layer and the
+marker knocks their opacity down where it passes. That's the detail that made it
+finally look like a highlighter going *over* the page.
 
-Two things reduced coverage together: the fade increase, and curving nib width
-so mid-arousal speech no longer draws a broad band. `0.003` remains the value
-that holds around 10% indefinitely.
+## Errors
 
-These figures come from stepping frames while wall-clock time advances. An
-earlier set was measured by driving frames synchronously, which froze the demo's
-`setInterval` and pinned arousal at a single value — leaving the nib at maximum
-width and speed throughout and overstating coverage.
+Failures show up in the artwork, not in a toast.
 
-Two consequences worth pointing out in a demo. Because every parameter eases
-toward its target at a fixed fraction per frame, the trails record recent
-emotional history as a colour gradient — you can see where the conversation has
-just been. And because the trail wash is what leaves those streaks, a sudden
-sentiment change never snaps; it arrives as a wave through the existing field.
-
-## Async behaviour and error handling
-
-Errors are expressed in the aura itself, not as toasts.
-
-- **Out-of-order responses.** Every `/process_text` call carries a monotonic
-  sequence number, echoed back by the backend. A response whose seq is not
-  strictly greater than the last applied one is dropped, so a slow reply can
-  never overwrite a fresh one.
-- **Slow or failing LLM.** 5s timeout with `max_retries=0` — the SDK retries
-  timeouts by default, which would silently make the budget 15s. Any failure
-  (timeout, network, HTTP error, refusal, malformed or out-of-range output,
-  missing key) returns a neutral analysis with `model_confidence: 0.0`, so the
-  field drifts toward washed-out neutral rather than freezing.
-- **WebSocket disconnect.** Reconnects with exponential backoff (500ms
-  doubling, capped at 8s, six attempts). While reconnecting the field
-  desaturates and slows; on giving up it goes essentially greyscale.
-- **Recording state.** A pulsing dot beside the Start/Stop button, plus the
-  colour of the connection label.
-
-Deepgram specifics: the backend call fires on `speech_final`, not `is_final`
-(see deviations below); `KeepAlive` every 8s or the socket drops after ~10s of
-silence; `CloseStream` on stop so the last utterance is flushed rather than lost.
+- **Out-of-order responses.** Every request carries a monotonic sequence number
+  the backend echoes back. Anything not strictly newer is dropped, so a slow reply
+  can never overwrite a fresh one.
+- **Slow or failing LLM.** 8s timeout with `max_retries=0` — that zero matters,
+  since the SDK retries timeouts by default. Any failure returns a neutral
+  reading, so the marker drifts washed-out rather than freezing.
+- **WebSocket drop.** Exponential backoff, 500ms doubling to 8s, six attempts.
+  While reconnecting the marker desaturates and slows; on giving up it goes grey.
+- **Deepgram specifics.** `KeepAlive` every 8s or the socket drops after ~10s of
+  silence; `CloseStream` on stop so the last utterance is flushed.
 
 ## Deliberate deviations from the brief
 
-| Brief says | This does | Why |
+| brief says | this does | why |
 |---|---|---|
-| §4.5 fire `/process_text` on `is_final: true` | fires on `speech_final` | `is_final` fires on every finalized interim chunk — many times per sentence — and would spam the LLM. `speech_final` marks an actual end of utterance. |
-| §4.10 "React passes these new state variables as props to the visualization" | React state for the DOM UI, a `useRef` mirror for the sketch | Props captured in a p5 `draw()` closure go stale. Both are kept, so nothing in the brief's data flow is lost. |
-| `react-p5` listed first | p5 instance mode inside `useEffect` | `react-p5` is effectively unmaintained. |
-| `axios`, Web Audio API | `fetch`, `MediaRecorder` | Equivalent here, fewer dependencies. An AudioWorklet PCM pipeline wasn't worth the time. |
-| OpenAI in §4.6–4.7 | Anthropic | §1 explicitly permits it. |
-
-Two gaps in the brief are worth noting. §4.6–4.7 reference "the prompt (see
-section 3)" and "a JSON (like in section 3)", but §3 contains neither — and says
-prompt quality isn't assessed — so the schema above is this project's own
-definition. And demo mode appears nowhere in the brief; it's an addition,
-justified by the error-handling rubric line and by being the live-demo fallback.
+| fire on `is_final: true` | fires on `speech_final` | `is_final` fires several times per sentence and would hammer the LLM |
+| pass state as props to the visualization | React state for the DOM, a `useRef` mirror for the canvas | props captured in a p5 `draw()` closure go stale; both are kept |
+| `react-p5` | p5 instance mode in `useEffect` | `react-p5` is effectively unmaintained |
+| `axios`, Web Audio API | `fetch`, `MediaRecorder` | equivalent here, fewer dependencies |
+| OpenAI | Anthropic | the brief explicitly permits it |
 
 ## Known tradeoffs
 
-- **The Deepgram key authenticates from the browser, not via a minted token.**
-  The intended design mints a short-lived token server-side so the key never
-  reaches the browser. The key supplied cannot do that — `POST /v1/auth/grant`
-  returns `FORBIDDEN / Insufficient permissions`, while `GET /v1/projects`
-  returns 200, so the key is valid but lacks token-grant permission. The app
-  therefore asks the backend for a token first and falls back to
-  `VITE_DEEPGRAM_KEY` when that fails, logging a console warning. Supplying a
-  token-capable key upgrades it automatically, no code change.
-- **The bearer subprotocol is still unverified.** Browsers can't set WebSocket
-  headers, so credentials ride `Sec-WebSocket-Protocol`. The key form
-  `["token", KEY]` is *verified working* — a handshake against Deepgram
-  negotiated protocol `"token"`. The minted-JWT form `["bearer", token]` could
-  not be exercised, since no token could be minted.
-- **Mic capture is the one path not executed.** The token endpoint, the socket
-  handshake, the backend and the LLM are all verified against live services.
-  Browser mic capture was not, because the available browser blocked
-  `getUserMedia`.
-- **Structured output constrains shape, not range.** The API rejects
-  `minimum`/`maximum` and `maxItems` in an `output_config.format` schema
-  (verified: *"For 'number' type, properties maximum, minimum are not
-  supported"*). Ranges are stated in the prompt and enforced by Pydantic, which
-  **clamps** rather than rejects — discarding a reading over a 1.02 would drop
-  the aura to neutral for a whole utterance. Malformed shapes and wrong types
-  are still rejected outright.
-- **`ANTHROPIC_MODEL` defaults to `claude-sonnet-5`, not Opus.** Measured on
-  this prompt, four utterances each: Opus 5 median 4.67s / max 5.88s, Sonnet 5
-  median 3.08s / max 3.20s, Haiku 4.5 median 2.15s but a 6.73s outlier. Opus
-  exceeded the original 5s budget, so the timeout is now 8s and the default is
-  Sonnet. Haiku also rejects `output_config.effort` outright, so effort is sent
-  only to models that accept it. `scripts/smoke_anthropic.py` prints per-call
-  latency if you want to re-decide.
-- **No component-level React tests.** The state coordination between
-  `useTranscription` and `App` was verified in a browser rather than with a
-  testing library. Pure logic is unit-tested; rendering is not.
-- **Reduced motion is implemented but not exercised.** `prefers-reduced-motion`
-  zeroes the transcript word and pill animations. The rule is in place; no
-  environment was available to assert it with the preference actually set. Note
-  it does not cover the canvas — the marker and the write-on are drawn, not CSS.
-- **Every font is a system stack.** The page's words lead with macOS
-  handwriting faces (Bradley Hand, Noteworthy, Marker Felt) falling back to
-  generic `cursive`; the transcript is a system serif; the interface chrome is a
-  system grotesque. Deliberate: a webfont that fails to load on unknown demo
-  wifi is a visible failure. On a non-Mac the words are still handwriting, but
-  not these faces.
+- **The Deepgram key authenticates from the browser.** The intended design mints a
+  short-lived token server-side, but the available key returns `FORBIDDEN` from
+  `/v1/auth/grant` — valid, but without token-grant permission. The app asks the
+  backend for a token first and falls back to `VITE_DEEPGRAM_KEY`, so a
+  token-capable key upgrades it with no code change. The brief's own data flow has
+  the frontend connect to Deepgram directly anyway.
+- **Colour is not mapped to sentiment.** The brief names colour as a parameter;
+  this maps gesture, speed, width and opacity instead, to keep the marker
+  believable as a single physical pen. Failure is the only thing that drains it.
+- **Mic capture is the one path not verified.** The token endpoint, socket
+  handshake, backend and LLM were all exercised against live services; browser mic
+  capture was not, because the available browser blocked `getUserMedia`.
+- **Every font is a system stack** — handwriting for the page, a serif for the
+  transcript, a grotesque for the chrome. A webfont that fails to load on unknown
+  demo wifi is a visible failure. On a non-Mac the words are still handwriting,
+  but not the same faces.
 
 ## Tests
 
 ```bash
-cd backend && uv run pytest
+cd backend && uv run pytest     # 37
+cd frontend && npm test         # 124
 ```
 
-29 tests: schema range validation and closure, and every analyzer fallback path
-(timeout, connection error, refusal, malformed JSON, out-of-range values,
-missing key, unexpected exception), plus the token endpoint's success, 503, 502
-and key-leak cases.
+They cover the sequence-number gate, the sentiment→visual mapping at its
+boundaries, the noise field's range and continuity, the monotonic wear invariant,
+keyword placement and one-by-one arrival, every analyzer fallback path, and the
+`speech_final`-not-`is_final` rule. Rendering isn't unit-tested — that's what demo
+mode and human eyes are for.
 
-```bash
-cd frontend && npm test
-```
-
-92 tests: the sequence-number staleness gate, the sentiment→marker mapping at
-its boundaries (including that no valence leaves the pink family), the noise
-field's range, continuity and paper-vs-pen scale separation, the monotonic wear
-invariant, shortest-angle wrapping and turn rates, keyword placement, sizing and
-page cap, paper re-render throttling, transcript line identity across the
-sliding window, the demo driver's output ranges, and the
-`speech_final`-not-`is_final` submit rule with backoff growth.
-
-There is also a standalone tuning page at `/tune.html` in dev, with sliders for
-every paper, marker and colour parameter, plus sample words to judge the
-highlighter-over-text balance. It imports the same modules the app uses, so
-values dialled in there transfer directly. It is not part of the production
-build.
-
-The visualization itself is verified by eye — and, in automated checks, by
-driving frames through p5's `redraw()` and measuring canvas luminance and
-saturation, since browsers suspend `requestAnimationFrame` in hidden tabs.
+There's also a tuning page at `/tune.html` in dev, with sliders for every paper
+and marker parameter. It imports the same modules the app uses, so values dialled
+in there transfer directly. It isn't part of the production build.
