@@ -172,11 +172,19 @@ bulges where the pen curves. That correlation is deliberate; a second seed would
 destroy it.
 
 **Paper wear is cumulative and never resets.** Each analysis update adds
-`arousal * 0.01` to a monotonic accumulator that drives crinkle depth. A calm
+`arousal² × 0.11` to a monotonic accumulator that drives crinkle depth. A calm
 conversation stays smooth; a long intense one leaves a permanently worn surface
 that stays worn after things settle. Only an explicit reset lowers it — the
 value is a getter over a private field, so an assignment throws rather than
 silently succeeding.
+
+Arousal is squared, and the rate was set from the demo's real cadence rather
+than picked: at one utterance every 3.2s the surface reaches full depth in
+around 65 seconds of energetic speech, while quiet speech would take over twenty
+minutes. A linear scale could not do both — fast enough to see inside a demo
+also meant calm speech wearing the page, and the original rate needed nine
+minutes of shouting before the surface moved at all. Measured bare-paper
+contrast over a demo: 5.9% fresh, 21.5% after twenty seconds.
 
 ### Visual direction
 
