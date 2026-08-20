@@ -7,13 +7,21 @@
 
 export const HIGHLIGHTER = {
   // ---- paper ----
-  /** Multiplier on the shared GRAIN_SCALE. */
-  grainScale: 0.3,
   /**
-   * An unworn sheet still has tooth. Wear scales the remaining depth on top of
-   * this, so a calm session stays smooth without looking like a blank render.
+   * Multiplier on the shared GRAIN_SCALE. Raised for a finer tooth that reads
+   * as paper fibre rather than soft blotches.
+   *
+   * There is a ceiling: the paper renders to a quarter-resolution buffer and is
+   * upscaled, so grain features finer than roughly 8 screen pixels are smoothed
+   * away. At this value features land near 18px and survive the upscale.
    */
-  baselineCrinkle: 0.2,
+  grainScale: 0.55,
+  /**
+   * An unworn sheet still has tooth, and enough of it to be obvious. Wear
+   * scales the remaining depth on top of this, so a calm session still looks
+   * like paper rather than a blank render.
+   */
+  baselineCrinkle: 0.32,
 
   // ---- marker ----
   /** Multiplier on the shared GESTURE_SCALE. */
@@ -64,7 +72,7 @@ export const HIGHLIGHTER = {
    * the intent: a document that gets progressively highlighted. Set 0.003 if a
    * mostly-clear page that holds indefinitely is wanted instead.
    */
-  fadeRate: 0.0003,
+  fadeRate: 0.0005,
 
   /** Frames drawn before first display, so the page is never blank. */
   seedSteps: 140,

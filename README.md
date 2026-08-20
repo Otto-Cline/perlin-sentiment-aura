@@ -1,10 +1,12 @@
 # Sentiment Aura
 
-A live speech visualization. You talk; the words appear on screen and a Perlin
-flow field behind them shifts its colour, energy and form to match the emotional
+A live speech visualization. You talk; your words appear on screen, the key ones
+are written by hand onto a sheet of paper, and a pink highlighter sweeps across
+that page — its speed, width, opacity and gesture all driven by the emotional
 shape of what you said. Speech goes to Deepgram, finalized utterances go to a
-FastAPI backend, and Claude scores each one along four independent emotional
-dimensions that drive four independent visual channels.
+FastAPI backend, and Claude scores each one along four dimensions. The marker
+follows a Perlin field and never targets the words; whatever lies under it gets
+marked.
 
 ## Setup
 
@@ -49,7 +51,6 @@ feed the identical downstream pipeline.
 | Mode | Transcript | Analysis | Needs |
 |---|---|---|---|
 | **Demo** | scripted six-line arc | scripted, on a 3.2s timer | nothing — no mic, no network |
-
 | **Sample** | one fixed sample line | real `/process_text` → Claude | Anthropic key |
 | **Live mic** | real Deepgram stream | real `/process_text` → Claude | both keys |
 
@@ -168,29 +169,14 @@ silently succeeding.
 
 ### Visual direction
 
-The field is a pen plotter tracing a vector field, so the whole interface is
-built as instrument-on-paper: dark ink on warm off-white stock, strokes
-darkening the paper as they overlap rather than glowing. Two typefaces, both
-from system stacks so there is no webfont that can fail mid-demo — a serif for
-transcript text, because that is speech being typeset, and a monospace for
-instrument chrome (labels, controls, status). The only saturated colour in the
-interface is the ink hue itself; one oxblood is reserved for recording and
-errors, and nothing else competes.
-
-| Signal | Visual parameter | Reasoning |
-|---|---|---|
-| valence | ink hue (slate blue → bronze) | Warmth reads as pleasantness pre-verbally, so the most legible channel carries the primary emotional axis. At ink brightness a cold hue reads as slate blue and a warm one as bronze — gold ink does not exist, ochre does. Valence is eased (exponent 0.55) before crossing the hue range: a linear map spends its whole middle in green, which is where ordinary speech sits, so the field would look green nearly always and true blue would appear only at valence -1. Eased, green is confined to roughly \|valence\| < 0.15. |
-| arousal | particle speed, noise time-step, field turbulence | Energy in the data becomes energy in the motion. Immediately readable without a legend. |
-| speaker_certainty | field coherence — high aligns particles into laminar streams, low makes the noise octaves disagree and fragments the flow into eddies | Form mirrors conviction: a decisive speaker produces order, a hedging one produces turbulence. |
-| model_confidence | saturation and opacity | Low confidence *literally looks washed out* — on paper it reads as grey graphite rather than coloured ink. The visualization is honest about its own uncertainty instead of asserting a confident neutral. |
-| keyword weight | font size and lifetime | Important words are bigger and linger longer. |
-
-The through-line: four independent signals drive four independent visual
-channels, so a viewer reads them simultaneously without the channels colliding.
-
-**The pen never changes colour.** Hue and saturation are fixed, so the marker
-reads as one physical highlighter throughout. Sentiment changes how it moves and
-how heavily it marks, never what colour it is.
+A marked-up page, not an instrument readout. The canvas is paper: an off-white
+sheet with a visible tooth, handwritten keywords, and one translucent pink
+marker over them. The interface around it is deliberately the opposite — a clean
+grotesque in small caps, so crisp UI reads against handwritten content. Three
+type roles, all from system stacks so no webfont can fail mid-demo: handwriting
+for the page's words, a serif for transcript prose, a grotesque for chrome. The
+only saturated colour anywhere is the marker; a single oxblood is reserved for
+recording and errors.
 
 | Signal | Marker parameter | Reasoning |
 |---|---|---|
@@ -226,7 +212,7 @@ Measured on the demo script, marked page area:
 |---|---|
 | `0.003` | ~10%, stable from 40s out past 220s |
 | `0.001` | 51% at 22s, 72% at 44s — still climbing |
-| `0.0003` (shipped) | 63% at 20s, keeps climbing |
+| `0.0005` (shipped) | still largely covers the page within ~15s of an energetic passage |
 
 The shipped value is deliberately slow: the page becomes largely marked over a
 few minutes, which is the point — a document that gets progressively
@@ -234,9 +220,14 @@ highlighted. Set `0.003` for a mostly-clear page that holds indefinitely.
 
 Note the interaction with demo mode. The demo script averages higher arousal
 than it used to, precisely so the speed and width channels show themselves — and
-arousal is half the deposit term. Measured: one full pass of the script reaches
-**82% marked in about 24 seconds**. If that is too fast, the fade rate is the
-dial; the demo is doing its job.
+arousal is half the deposit term. Measured around the script's loudest passage,
+the page reaches **~82% marked within 15 seconds**. Coverage readings therefore
+depend on where in the script they are taken, since arousal varies by line.
+
+The shipped fade is a small increase over `0.0003`, and the effect on coverage is
+correspondingly small — the deposit term dominates. Getting a visibly clearer
+page needs a larger bump, not a tiny one: `0.003` is the value that holds around
+10% indefinitely.
 
 These figures come from stepping frames while wall-clock time advances. An
 earlier set was measured by driving frames synchronously, which froze the demo's
@@ -314,10 +305,12 @@ justified by the error-handling rubric line and by being the live-demo fallback.
   zeroes the transcript word and pill animations. The rule is in place; no
   environment was available to assert it with the preference actually set. Note
   it does not cover the canvas — the marker and the write-on are drawn, not CSS.
-- **The handwriting font is a system stack.** It leads with macOS faces
-  (Bradley Hand, Noteworthy, Marker Felt) and falls back to generic `cursive`.
-  Deliberate: a webfont that fails to load on unknown demo wifi is a visible
-  failure. On a non-Mac the words will still be handwriting, but not these.
+- **Every font is a system stack.** The page's words lead with macOS
+  handwriting faces (Bradley Hand, Noteworthy, Marker Felt) falling back to
+  generic `cursive`; the transcript is a system serif; the interface chrome is a
+  system grotesque. Deliberate: a webfont that fails to load on unknown demo
+  wifi is a visible failure. On a non-Mac the words are still handwriting, but
+  not these faces.
 
 ## Tests
 

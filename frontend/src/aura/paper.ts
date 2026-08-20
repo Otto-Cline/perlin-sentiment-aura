@@ -18,22 +18,18 @@ export const RERENDER_MS = 300;
 /** Re-render early if crinkle has moved at least this much. */
 export const CRINKLE_EPSILON = 0.02;
 
-/**
- * Peak luminance swing at full crinkle, as a fraction. Kept low on purpose:
- * past roughly 12% the surface stops reading as texture and starts competing
- * with the ink.
- */
+/** Peak luminance swing at full crinkle, as a fraction. Scaled by SHADE_GAIN. */
 const MAX_LUMINANCE_SWING = 0.11;
 
 /**
  * Converts the field gradient into a shade multiplier. Calibrated by measuring
  * rendered luminance rather than derived: the gradient's magnitude depends on
  * the grain scale and the finite-difference spacing, so the honest way to set
- * this is to render and measure. Raised past the original 8-12% target on
- * request, so the surface is plainly visible rather than merely implied.
+ * this is to render and measure. Raised well past the original 8-12% target on
+ * request: the surface should plainly read as paper, not merely be implied.
  * Re-measure if GRAIN_SCALE or SCALE_DIV changes.
  */
-const SHADE_GAIN = 4.2;
+const SHADE_GAIN = 5.6;
 
 /** Light from the upper left, normalized. */
 const LIGHT_X = -0.7071;
