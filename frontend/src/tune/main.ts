@@ -1,67 +1,76 @@
 /**
- * Standalone tuning page for the paper-and-ink renderer.
+ * Standalone tuning page for the highlighter renderer.
  *
- * Imports the same field, paper, ink and wear modules the app will use, so
- * numbers dialled in here transfer directly. Not wired into the app, and not
- * part of the production build.
+ * Imports the same field, paper, keyword and highlighter modules the app uses,
+ * so numbers dialled in here transfer directly. Not part of the production
+ * build, and not wired into the app.
  */
 
 import "./tune.css";
-import { createInkLayer, type InkParams } from "../aura/ink";
-import { blitPaper, createPaperLayer, type PaperParams } from "../aura/paper";
+import { blitPaper, createPaperLayer } from "../aura/paper";
+import { createHighlighterLayer } from "../aura/highlighter";
+import { drawKeywords, mergePlaced, type PlacedKeyword } from "../aura/keywordPaper";
 import { PaperWear } from "../aura/wear";
-import { HUE_NEGATIVE, HUE_POSITIVE } from "../aura/mapping";
+import { HIGHLIGHTER } from "../aura/preset";
 
 const EASING = 0.04;
+const FADE_BITE = 0.004;
+
+const SAMPLE_WORDS: [string, number][] = [
+  ["deployment", 0.95],
+  ["numbers", 0.8],
+  ["works", 0.9],
+  ["failed", 0.85],
+  ["logs", 0.55],
+  ["approach", 0.5],
+  ["strong", 0.7],
+  ["needed", 0.6],
+  ["meeting", 0.3],
+  ["quarter", 0.45],
+  ["broken", 0.75],
+  ["shipping", 0.65],
+];
 
 interface Controls {
-  // paper
   crinkle: number;
   grainScale: number;
-  // ink
-  inkOpacity: number;
+  thickness: number;
+  speed: number;
+  turnSharpness: number;
+  alpha: number;
   fadeRate: number;
-  strokeCount: number;
-  jitter: number;
-  // sentiment, so the mapping can be judged rather than guessed
+  hueCool: number;
+  hueWarm: number;
+  saturation: number;
+  lightness: number;
+  gestureScale: number;
+  keywordCount: number;
   valence: number;
   arousal: number;
   certainty: number;
   confidence: number;
-  // stroke behaviour
-  lifetime: number;
-  penLift: number;
-  gestureScale: number;
-  followContours: boolean;
-  useWear: boolean;
-  // Hue ramp anchors. At ink lightness the stock warm anchor (46) reads olive
-  // rather than gold; pulling it toward ~25 gives sienna instead.
-  hueCold: number;
-  hueWarm: number;
-  inkLightness: number;
+  driveFromSentiment: boolean;
 }
 
 const controls: Controls = {
   crinkle: 0.5,
-  grainScale: 1,
-  inkOpacity: 0.85,
-  fadeRate: 0.003,
-  strokeCount: 14,
-  jitter: 0.12,
-  // Mid valence maps to olive in ink (hue ~81); starting warmer so the first
-  // look is not the least flattering point on the ramp.
-  valence: 0.65,
+  grainScale: HIGHLIGHTER.grainScale,
+  thickness: 24,
+  speed: 3,
+  turnSharpness: 0.3,
+  alpha: 0.16,
+  fadeRate: HIGHLIGHTER.fadeRate,
+  hueCool: HIGHLIGHTER.hueCool,
+  hueWarm: HIGHLIGHTER.hueWarm,
+  saturation: HIGHLIGHTER.saturation,
+  lightness: HIGHLIGHTER.lightness,
+  gestureScale: HIGHLIGHTER.gestureScale,
+  keywordCount: 12,
+  valence: 0.3,
   arousal: 0.5,
   certainty: 0.7,
   confidence: 0.8,
-  lifetime: 320,
-  penLift: 0.004,
-  gestureScale: 1,
-  followContours: true,
-  useWear: false,
-  hueCold: HUE_NEGATIVE,
-  hueWarm: HUE_POSITIVE,
-  inkLightness: 28,
+  driveFromSentiment: false,
 };
 
 const SLIDERS: {
@@ -74,25 +83,18 @@ const SLIDERS: {
   format?: (v: number) => string;
 }[] = [
   { key: "crinkle", label: "Crinkle depth", min: 0, max: 1, step: 0.01, group: "Paper" },
-  { key: "grainScale", label: "Grain scale", min: 0.2, max: 3, step: 0.05, group: "Paper" },
-  { key: "inkOpacity", label: "Ink opacity", min: 0.02, max: 1, step: 0.01, group: "Ink" },
-  {
-    key: "fadeRate",
-    label: "Fade rate",
-    min: 0,
-    max: 0.05,
-    step: 0.0005,
-    group: "Ink",
-    format: (v) => v.toFixed(4),
-  },
-  { key: "strokeCount", label: "Stroke count", min: 1, max: 40, step: 1, group: "Ink" },
-  { key: "jitter", label: "Jitter (rad)", min: 0, max: 1, step: 0.01, group: "Ink" },
-  { key: "lifetime", label: "Stroke lifetime (frames)", min: 30, max: 1200, step: 10, group: "Ink" },
-  { key: "penLift", label: "Pen lift chance", min: 0, max: 0.05, step: 0.001, group: "Ink", format: (v) => v.toFixed(3) },
-  { key: "gestureScale", label: "Gesture scale", min: 0.2, max: 3, step: 0.05, group: "Ink" },
-  { key: "hueCold", label: "Hue — cold anchor", min: 150, max: 280, step: 1, group: "Ink" },
-  { key: "hueWarm", label: "Hue — warm anchor", min: 0, max: 90, step: 1, group: "Ink" },
-  { key: "inkLightness", label: "Ink lightness %", min: 12, max: 50, step: 1, group: "Ink" },
+  { key: "grainScale", label: "Grain scale", min: 0.1, max: 2, step: 0.05, group: "Paper" },
+  { key: "keywordCount", label: "Words on page", min: 0, max: 12, step: 1, group: "Paper" },
+  { key: "thickness", label: "Nib thickness", min: 4, max: 60, step: 1, group: "Marker" },
+  { key: "speed", label: "Stroke speed", min: 0.3, max: 10, step: 0.1, group: "Marker" },
+  { key: "turnSharpness", label: "Turn sharpness", min: 0, max: 1, step: 0.01, group: "Marker" },
+  { key: "alpha", label: "Stroke lightness", min: 0.02, max: 0.5, step: 0.005, group: "Marker", format: (v) => v.toFixed(3) },
+  { key: "fadeRate", label: "Fade rate", min: 0, max: 0.02, step: 0.0002, group: "Marker", format: (v) => v.toFixed(4) },
+  { key: "gestureScale", label: "Gesture scale", min: 0.1, max: 2, step: 0.05, group: "Marker" },
+  { key: "hueCool", label: "Hue — cool (negative)", min: 260, max: 340, step: 1, group: "Colour" },
+  { key: "hueWarm", label: "Hue — warm (positive)", min: 340, max: 400, step: 1, group: "Colour" },
+  { key: "saturation", label: "Saturation %", min: 40, max: 100, step: 1, group: "Colour" },
+  { key: "lightness", label: "Lightness %", min: 40, max: 85, step: 1, group: "Colour" },
   { key: "valence", label: "valence", min: -1, max: 1, step: 0.01, group: "Sentiment" },
   { key: "arousal", label: "arousal", min: 0, max: 1, step: 0.01, group: "Sentiment" },
   { key: "certainty", label: "speaker_certainty", min: 0, max: 1, step: 0.01, group: "Sentiment" },
@@ -107,122 +109,142 @@ stage.appendChild(view);
 const ctx = view.getContext("2d")!;
 
 let paper = createPaperLayer(1, 1);
-let ink = createInkLayer(1, 1);
+let marker = createHighlighterLayer(1, 1);
+let placed: PlacedKeyword[] = [];
 const wear = new PaperWear();
 
-function resize() {
-  const w = stage.clientWidth;
-  const h = stage.clientHeight;
-  view.width = w;
-  view.height = h;
-  paper.resize(w, h);
-  ink.resize(w, h);
-  paper.invalidate();
-  seedInk();
-}
-
-// Everything visual eases; nothing snaps. Mirrors the app's easing loop.
 const eased = {
-  hue: 200,
-  saturation: 40,
-  opacity: controls.inkOpacity,
-  speed: 1.2,
-  jitter: controls.jitter,
-  commitment: controls.certainty,
+  hue: 330,
+  saturation: controls.saturation,
+  lightness: controls.lightness,
+  alpha: controls.alpha,
+  thickness: controls.thickness,
+  speed: controls.speed,
+  turnSharpness: controls.turnSharpness,
   crinkle: controls.crinkle,
   temperature: 0.5,
-  penLift: controls.penLift,
 };
 
 function targets() {
-  const warmth = Math.min(1, Math.max(0, (controls.valence + 1) / 2));
-  const easedWarmth = Math.sign(controls.valence) *
-      Math.abs(controls.valence) ** 0.55;
-  const hueT = Math.min(1, Math.max(0, (easedWarmth + 1) / 2));
+  if (!controls.driveFromSentiment) {
+    const warmth = Math.min(1, Math.max(0, (controls.valence + 1) / 2));
+    return {
+      hue: controls.hueCool + (controls.hueWarm - controls.hueCool) * warmth,
+      saturation: controls.saturation,
+      lightness: controls.lightness,
+      alpha: controls.alpha,
+      thickness: controls.thickness,
+      speed: controls.speed,
+      turnSharpness: controls.turnSharpness,
+      crinkle: controls.crinkle,
+      temperature: 0.35 + warmth * 0.4,
+    };
+  }
 
+  // Mirrors highlighterMapping, but reading the sliders' hue anchors so the
+  // ramp can be tuned without editing the preset.
+  const v = Math.min(1, Math.max(-1, controls.valence));
+  const eV = Math.sign(v) * Math.abs(v) ** 0.55;
+  const warmth = Math.min(1, Math.max(0, (eV + 1) / 2));
   return {
-    hue: controls.hueCold + (controls.hueWarm - controls.hueCold) * hueT,
-    saturation: 8 + 84 * controls.confidence,
-    opacity: controls.inkOpacity * (0.25 + 0.75 * controls.confidence),
-    speed: 0.5 + 4 * controls.arousal,
-    jitter: controls.jitter * (0.3 + controls.arousal),
-    commitment: controls.certainty,
-    crinkle: controls.useWear ? wear.crinkle : controls.crinkle,
+    hue: controls.hueCool + (controls.hueWarm - controls.hueCool) * warmth,
+    saturation: controls.saturation,
+    lightness: controls.lightness,
+    alpha: 0.04 + 0.2 * controls.confidence,
+    thickness: 13 + 21 * controls.arousal,
+    speed: 1.2 + 4.3 * controls.arousal,
+    turnSharpness: 1 - controls.certainty,
+    crinkle: controls.crinkle,
     temperature: 0.35 + warmth * 0.4,
-    penLift: controls.penLift * (1.6 - controls.confidence),
   };
+}
+
+function markerParams() {
+  return {
+    hue: eased.hue,
+    saturation: eased.saturation,
+    lightness: eased.lightness,
+    alpha: eased.alpha,
+    thickness: eased.thickness,
+    speed: eased.speed,
+    turnSharpness: eased.turnSharpness,
+  };
+}
+
+function syncKeywords() {
+  placed = [];
+  const wanted = SAMPLE_WORDS.slice(0, controls.keywordCount);
+  placed = mergePlaced(
+    placed,
+    wanted.map(([text, weight]) => ({ text, weight })),
+    view.width,
+    view.height,
+    // Backdated so they are already faded in.
+    -5000,
+  );
+}
+
+function resize() {
+  view.width = stage.clientWidth;
+  view.height = stage.clientHeight;
+  paper.resize(view.width, view.height);
+  marker.resize(view.width, view.height);
+  paper.invalidate();
+  syncKeywords();
+  reseed();
 }
 
 let t = 0;
-
-function seedInk() {
-  ink.clear();
-  const target = targets();
-  Object.assign(eased, target);
-  ink.seed(inkParams(), t, 700);
-}
-
-function inkParams(): InkParams {
-  return {
-    strokeCount: controls.strokeCount,
-    speed: eased.speed,
-    jitter: eased.jitter,
-    commitment: eased.commitment,
-    opacity: eased.opacity,
-    penLift: eased.penLift,
-    hue: eased.hue,
-    saturation: eased.saturation,
-    lightness: controls.inkLightness,
-    lifetime: controls.lifetime,
-    followContours: controls.followContours,
-    gestureScale: controls.gestureScale,
-  };
-}
-
-function paperParams(): PaperParams {
-  return {
-    crinkle: eased.crinkle,
-    grainScale: controls.grainScale,
-    temperature: eased.temperature,
-  };
-}
-
 let fadeAccumulator = 0;
+
+function reseed() {
+  marker.clear();
+  Object.assign(eased, targets());
+  marker.seed(markerParams(), t, HIGHLIGHTER.seedSteps);
+}
+
 let frames = 0;
 let lastFpsAt = performance.now();
 let fps = 0;
 
-/** One full render. The only place the frame sequence is written. */
 function renderOnce(now: number) {
   const target = targets();
   for (const key of Object.keys(eased) as (keyof typeof eased)[]) {
     eased[key] += (target[key] - eased[key]) * EASING;
   }
 
-  if (controls.useWear) wear.add(controls.arousal);
-
   t += 0.004 + eased.speed * 0.0006;
 
-  paper.update(paperParams(), t, now);
+  paper.update(
+    {
+      crinkle: eased.crinkle,
+      grainScale: controls.grainScale,
+      temperature: eased.temperature,
+    },
+    t,
+    now,
+  );
 
-  // Fade in small periodic bites: one tiny erase per frame would round to
-  // nothing, and a large one every frame would wipe the drawing.
   fadeAccumulator += controls.fadeRate;
-  if (fadeAccumulator >= 0.004) {
-    ink.fade(fadeAccumulator);
+  if (fadeAccumulator >= FADE_BITE) {
+    marker.fade(fadeAccumulator);
     fadeAccumulator = 0;
   }
 
-  ink.step(inkParams(), t);
+  marker.step(markerParams(), t);
 
   ctx.clearRect(0, 0, view.width, view.height);
   blitPaper(ctx, paper, view.width, view.height);
-  ctx.drawImage(ink.canvas, 0, 0);
+  drawKeywords(ctx, placed, now);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.drawImage(marker.canvas, 0, 0);
+  ctx.restore();
 }
 
 function frame(now: number) {
   renderOnce(now);
-
   frames++;
   if (now - lastFpsAt >= 500) {
     fps = Math.round((frames * 1000) / (now - lastFpsAt));
@@ -230,7 +252,6 @@ function frame(now: number) {
     lastFpsAt = now;
     paintReadout();
   }
-
   requestAnimationFrame(frame);
 }
 
@@ -240,9 +261,9 @@ const panel = document.getElementById("panel")!;
 const groups = new Map<string, HTMLFieldSetElement>();
 
 panel.innerHTML =
-  "<h1>Aura tuning</h1>" +
-  "<p class='hint'>Same field, paper and ink modules the app will use. " +
-  "Nothing here is wired into the app yet.</p>";
+  "<h1>Highlighter tuning</h1>" +
+  "<p class='hint'>Same paper, keyword and marker modules the app uses. " +
+  "The marker follows the Perlin field only — it never targets words.</p>";
 
 for (const slider of SLIDERS) {
   let group = groups.get(slider.group);
@@ -261,7 +282,7 @@ for (const slider of SLIDERS) {
 
   row.innerHTML =
     `<label for="${id}">${slider.label}</label>` +
-    `<output id="o-${slider.key}">${fmt(value)}</output>` +
+    `<output>${fmt(value)}</output>` +
     `<input type="range" id="${id}" min="${slider.min}" max="${slider.max}" ` +
     `step="${slider.step}" value="${value}" />`;
   group.appendChild(row);
@@ -273,45 +294,29 @@ for (const slider of SLIDERS) {
     (controls[slider.key] as number) = next;
     out.textContent = fmt(next);
     if (slider.key === "grainScale") paper.invalidate();
+    if (slider.key === "keywordCount") syncKeywords();
   });
 }
 
-function addCheckbox(
-  key: "followContours" | "useWear",
-  label: string,
-  hint: string,
-) {
-  const wrap = document.createElement("label");
-  wrap.className = "check";
-  wrap.innerHTML =
-    `<input type="checkbox" ${controls[key] ? "checked" : ""} /> ` +
-    `<span>${label} <span style="color:var(--graphite)">${hint}</span></span>`;
-  const box = wrap.querySelector("input")!;
-  box.addEventListener("change", () => {
-    controls[key] = box.checked;
-  });
-  groups.get("Ink")!.appendChild(wrap);
-}
-
-addCheckbox("followContours", "Follow contours", "(90° — avoids sinks)");
-addCheckbox(
-  "useWear",
-  "Drive crinkle from wear",
-  "(accumulates per frame here, so it saturates in seconds — the app must " +
-    "add once per analysis update instead)",
-);
+const sentimentToggle = document.createElement("label");
+sentimentToggle.className = "check";
+sentimentToggle.innerHTML =
+  "<input type='checkbox' /> <span>Drive marker from sentiment " +
+  "<span style='color:var(--graphite)'>(thickness, speed, sharpness and " +
+  "lightness follow the four signals instead of their sliders)</span></span>";
+groups.get("Sentiment")!.appendChild(sentimentToggle);
+sentimentToggle.querySelector("input")!.addEventListener("change", (e) => {
+  controls.driveFromSentiment = (e.target as HTMLInputElement).checked;
+});
 
 const actions = document.createElement("div");
 actions.className = "actions";
 actions.innerHTML =
-  "<button id='reseed'>Reseed ink</button>" +
-  "<button id='resetwear' class='secondary'>Reset wear</button>";
+  "<button id='reseed'>Clear marks</button>" +
+  "<button id='replace' class='secondary'>Re-place words</button>";
 panel.appendChild(actions);
-actions.querySelector("#reseed")!.addEventListener("click", seedInk);
-actions.querySelector("#resetwear")!.addEventListener("click", () => {
-  wear.reset();
-  paper.invalidate();
-});
+actions.querySelector("#reseed")!.addEventListener("click", reseed);
+actions.querySelector("#replace")!.addEventListener("click", syncKeywords);
 
 const readout = document.createElement("div");
 readout.className = "readout";
@@ -324,28 +329,26 @@ panel.appendChild(dump);
 
 function paintReadout() {
   readout.innerHTML =
-    `fps <b>${fps}</b> &nbsp; pens <b>${ink.penCount}</b><br />` +
-    `hue <b>${eased.hue.toFixed(0)}</b> &nbsp; sat <b>${eased.saturation.toFixed(0)}</b><br />` +
-    `speed <b>${eased.speed.toFixed(2)}</b> &nbsp; passes <b>${
-      1 + Math.round((1 - eased.commitment) * 3)
-    }</b><br />` +
-    `crinkle <b>${eased.crinkle.toFixed(3)}</b> &nbsp; wear <b>${wear.value.toFixed(3)}</b>`;
+    `fps <b>${fps}</b> &nbsp; words <b>${placed.length}</b><br />` +
+    `hue <b>${(eased.hue % 360).toFixed(0)}</b> &nbsp; ` +
+    `nib <b>${eased.thickness.toFixed(1)}</b><br />` +
+    `speed <b>${eased.speed.toFixed(2)}</b> &nbsp; ` +
+    `sharpness <b>${eased.turnSharpness.toFixed(2)}</b><br />` +
+    `alpha <b>${eased.alpha.toFixed(3)}</b> &nbsp; ` +
+    `crinkle <b>${eased.crinkle.toFixed(2)}</b>`;
 
   dump.value = JSON.stringify(
     {
-      crinkle: controls.crinkle,
       grainScale: controls.grainScale,
-      inkOpacity: controls.inkOpacity,
+      thicknessAtMidArousal: controls.thickness,
+      speedAtMidArousal: controls.speed,
+      alpha: controls.alpha,
       fadeRate: controls.fadeRate,
-      strokeCount: controls.strokeCount,
-      jitter: controls.jitter,
-      lifetime: controls.lifetime,
-      penLift: controls.penLift,
-      gestureScale: controls.gestureScale,
-      followContours: controls.followContours,
-      hueCold: controls.hueCold,
+      hueCool: controls.hueCool,
       hueWarm: controls.hueWarm,
-      inkLightness: controls.inkLightness,
+      saturation: controls.saturation,
+      lightness: controls.lightness,
+      gestureScale: controls.gestureScale,
     },
     null,
     1,
@@ -359,15 +362,19 @@ resize();
 paintReadout();
 requestAnimationFrame(frame);
 
-// Lets a headless check drive frames when the tab is hidden and rAF is
-// suspended. Dev-only page, so this is always available here.
+// Lets a headless check drive frames while the tab is hidden and rAF is
+// suspended. Dev-only page.
 (window as unknown as Record<string, unknown>).__tune = {
   step(n: number) {
     for (let i = 0; i < n; i++) renderOnce(performance.now());
     paintReadout();
   },
-  seedInk,
+  reseed,
+  syncKeywords,
   controls,
-  wear,
   eased,
+  wear,
+  get placed() {
+    return placed;
+  },
 };

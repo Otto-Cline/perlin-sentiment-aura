@@ -1,54 +1,66 @@
 /**
- * Tuned constants for the ink renderer, dialled in by hand on /tune.html.
+ * Tuned constants for the highlighter renderer.
  *
- * These are settled values, not guesses — change them from the tuning page and
- * copy the result back, rather than nudging them here.
+ * Adjust from /tune.html and copy the result back here, rather than nudging
+ * these by hand.
  */
 
-export const INK_PRESET = {
+export const HIGHLIGHTER = {
   // ---- paper ----
   /** Multiplier on the shared GRAIN_SCALE. */
   grainScale: 0.3,
-
   /**
-   * Paper is never perfectly flat: an unworn sheet still has tooth. Wear scales
-   * the remaining depth on top of this, so a calm session stays smooth without
-   * looking like a blank render.
+   * An unworn sheet still has tooth. Wear scales the remaining depth on top of
+   * this, so a calm session stays smooth without looking like a blank render.
    */
   baselineCrinkle: 0.12,
 
-  // ---- ink ----
+  // ---- marker ----
   /** Multiplier on the shared GESTURE_SCALE. */
   gestureScale: 0.75,
-  strokeCount: 3,
-  lifetime: 770,
-  opacity: 0.85,
+  /** One or two markers, no more. This is a page someone marked up. */
+  strokeCount: 2,
+
+  thicknessMin: 13,
+  thicknessMax: 34,
+  speedMin: 1.2,
+  speedMax: 5.5,
+
+  /** Translucent: the words must stay readable underneath. */
+  alphaMin: 0.04,
+  alphaMax: 0.24,
 
   /**
-   * Blue ink, not black. At 12 every hue collapsed into RGB 60-80 and the
-   * valence channel was unreadable; at 30 the cold end reads as a real blue
-   * pen and the warm end as sienna.
+   * Pink family only. Cool violet-magenta at negative valence through to warm
+   * coral at positive — real highlighters span this range, so it still reads as
+   * one marker rather than two different pens. Exceeds 360 on purpose; the
+   * renderer wraps it, which keeps the eased ramp continuous.
    */
-  lightness: 30,
+  hueCool: 310,
+  /**
+   * Rose, not coral. 370 (=10) turned the warm end orange, which stopped
+   * reading as a pink highlighter; 352 keeps the whole ramp inside pink.
+   */
+  hueWarm: 352,
+  saturation: 92,
+  lightness: 62,
 
   /**
-   * Small but non-zero. Zero made the canvas show hue *history* rather than the
-   * present — old amber strokes never left, so the average sat mid-ramp no
-   * matter what was being said. This still reads as an accumulating drawing
-   * over minutes while letting old hues recede.
+   * Marks fade slowly. Not a preference — arithmetic: two 24px nibs travelling
+   * ~3px per frame lay down ~144 px² per frame, which covers a 1280x800 page in
+   * about two and a half minutes. Without a fade the page goes solid pink.
+   * This holds marks for roughly a minute.
    */
-  fadeRate: 0.0004,
+  fadeRate: 0.006,
 
-  /** Pen never lifts at the tuned setting. */
-  penLift: 0,
+  /** Frames drawn before first display, so the page is never blank. */
+  seedSteps: 140,
 
-  followContours: true,
-
-  // ---- hue ramp ----
-  /**
-   * Cold anchor is true blue rather than the teal the tuning pass landed on, so
-   * negative valence reads blue and not green.
-   */
-  hueCold: 222,
-  hueWarm: 38,
+  // ---- keywords on the page ----
+  /** Most words held at once; the oldest is dropped past this. */
+  maxKeywords: 26,
+  fontSizeMin: 15,
+  fontSizeMax: 44,
+  /** Candidate positions tried per word, picking the least crowded. */
+  placementTries: 12,
 } as const;

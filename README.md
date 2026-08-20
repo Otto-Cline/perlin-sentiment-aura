@@ -105,16 +105,20 @@ scoring one utterance at a time makes the values thrash on filler words.
 
 ## Why this sentiment → visual mapping
 
-### Two visualization styles
+### The visualization
 
-The switch at top right chooses between them. Both read the same analysis
-stream and share one noise field.
+Three layers, back to front:
 
-- **Ink** (default) — three pens trace the field and leave a near-permanent
-  drawing on shaded paper. The ink shows the present moment; the paper shows the
-  whole session.
-- **Streams** — the earlier renderer: hundreds of particles as flowing
-  streamlines.
+1. **Paper** — a crinkled surface, shaded from the noise field.
+2. **Keywords** — the model's keywords printed onto the page as they arrive,
+   sized and darkened by weight, and left there.
+3. **Highlighter** — two translucent pink markers tracing the field, composited
+   with `multiply` so the words stay readable underneath.
+
+**The marker never targets the words.** The Perlin field is the only thing
+steering it; whichever keywords happen to lie under the path get marked. That
+keeps the field the sole driver, which is both the brief's requirement and the
+reason the composition stays unpredictable.
 
 `field()` and `angleAt()` in `aura/field.ts` are the single source of noise.
 Paper grain and pen gesture call the *same function with the same seed* at
@@ -151,19 +155,27 @@ errors, and nothing else competes.
 The through-line: four independent signals drive four independent visual
 channels, so a viewer reads them simultaneously without the channels colliding.
 
-In the **ink** style the same four signals drive the pen instead of the field:
+Every marker channel is an intensity or a gesture, so valence — the one
+categorical signal — rides a narrow hue shift *inside the pink family* rather
+than a full colour ramp. It stays one marker, and the channel survives.
 
-| Signal | Ink parameter | Reasoning |
+| Signal | Marker parameter | Reasoning |
 |---|---|---|
-| valence | ink hue, blue pen → sienna | Measured swing is deliberate and large: negative valence renders around RGB (87, 142, 169), positive around (176, 152, 73). A subtler ramp was technically correct and unreadable in motion. |
-| arousal | travel speed and hand steadiness | Fast strokes also run *thin* while slow ones pool, so arousal is legible twice over — in motion and in line weight. |
-| speaker_certainty | stroke commitment | Above ~0.7 the pen draws one clean line. Below that it re-sketches the same path with random offsets, up to six overlapping passes at zero — the visual of someone drafting and re-drafting. |
-| model_confidence | opacity, saturation, pen lifts | An unsure read leaves a pale, broken line. Confident ink is solid and continuous. |
+| valence | hue, cool violet-magenta → warm rose | Real highlighters span this range, so it reads as one pen. Pushing the warm anchor past ~355 turns it orange and it stops reading as pink at all. |
+| arousal | stroke speed and nib thickness | Energy is a fast, broad mark. Legible twice over. |
+| speaker_certainty | turn sharpness | A decisive speaker sweeps in long arcs; a hedging one wanders and jerks. Certainty is inverted into sharpness, so high certainty means a steady hand. |
+| model_confidence | stroke lightness | An unsure read barely marks the page. Capped well below opaque at every confidence — a solid marker would hide the words it is supposed to be marking. |
+| keyword weight | size and darkness on the page | Important words are larger and sit heavier in the paper. |
 | cumulative arousal | paper crinkle depth | The only channel that records history rather than the present. |
 
-Ink is set on a curve rather than linearly where it matters: valence is eased
-before crossing the hue ramp, and commitment is curved so hesitation ramps
-steeply instead of creeping in.
+Two things are set on a curve rather than linearly: valence is eased before it
+crosses the hue ramp, and the nib deliberately *resists* the field. The field's
+heading spans two full turns, so a marker that tracks it closely writhes like a
+ribbon; resisting it is what makes a stroke read as a deliberate mark.
+
+Marks fade slowly, and that is arithmetic rather than preference: two 24px nibs
+travelling ~3px per frame lay down ~144 px² per frame, which covers a 1280×800
+page in about two and a half minutes. Without a fade the page goes solid pink.
 
 Two consequences worth pointing out in a demo. Because every parameter eases
 toward its target at a fixed fraction per frame, the trails record recent
@@ -251,15 +263,17 @@ and key-leak cases.
 cd frontend && npm test
 ```
 
-93 tests: the sequence-number staleness gate, both sentiment→visual mappings at
-their boundaries, the noise field's range, continuity and paper-vs-pen scale
-separation, the monotonic wear invariant, stroke commitment and width curves,
-paper re-render throttling, keyword merge and TTL expiry, transcript line
-identity across the sliding window, the demo driver's output ranges, and the
+92 tests: the sequence-number staleness gate, the sentiment→marker mapping at
+its boundaries (including that no valence leaves the pink family), the noise
+field's range, continuity and paper-vs-pen scale separation, the monotonic wear
+invariant, shortest-angle wrapping and turn rates, keyword placement, sizing and
+page cap, paper re-render throttling, transcript line identity across the
+sliding window, the demo driver's output ranges, and the
 `speech_final`-not-`is_final` submit rule with backoff growth.
 
 There is also a standalone tuning page at `/tune.html` in dev, with sliders for
-every paper and ink parameter. It imports the same modules the app uses, so
+every paper, marker and colour parameter, plus sample words to judge the
+highlighter-over-text balance. It imports the same modules the app uses, so
 values dialled in there transfer directly. It is not part of the production
 build.
 

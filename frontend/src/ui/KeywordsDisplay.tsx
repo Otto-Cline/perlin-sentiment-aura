@@ -4,25 +4,20 @@ interface Props {
   keywords: LiveKeyword[];
 }
 
-const STAGGER_MS = 140;
-
+/**
+ * The keywords are drawn onto the canvas now, where the highlighter can pass
+ * over them. Canvas text is invisible to assistive technology, so this mirrors
+ * them into the DOM, visually hidden.
+ */
 export function KeywordsDisplay({ keywords }: Props) {
   return (
-    <div className="keywords">
-      {keywords.map((kw, i) => (
-        // Keyed by text: index keys would restart the animation on re-render.
-        <span
-          key={kw.text}
-          className="keyword"
-          style={{
-            fontSize: `${14 + kw.weight * 26}px`,
-            opacity: 0.35 + kw.weight * 0.65,
-            animationDelay: `${(i % 6) * STAGGER_MS}ms`,
-          }}
-        >
-          {kw.text}
-        </span>
-      ))}
+    <div className="sr-only" aria-live="polite" aria-atomic="false">
+      <h2>Detected keywords</h2>
+      <ul>
+        {keywords.map((kw) => (
+          <li key={kw.text}>{kw.text}</li>
+        ))}
+      </ul>
     </div>
   );
 }

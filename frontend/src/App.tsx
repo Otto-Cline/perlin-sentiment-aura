@@ -4,16 +4,14 @@ import { TranscriptDisplay } from "./ui/TranscriptDisplay";
 import { useAnalysis } from "./state/useAnalysis";
 import { useTranscription } from "./state/useTranscription";
 import { createDemoDriver } from "./demo/driver";
-import { Aura } from "./aura/Aura";
-import { InkAura } from "./aura/InkAura";
+import { HighlighterAura } from "./aura/HighlighterAura";
 import { PaperWear } from "./aura/wear";
 import { KeywordsDisplay } from "./ui/KeywordsDisplay";
-import { RendererSwitch } from "./ui/RendererSwitch";
 import { useKeywordCloud } from "./state/useKeywordCloud";
 import type {
   Analysis,
   ConnectionState,
-  RendererMode,
+  Keyword,
   SourceMode,
 } from "./types";
 import "./styles.css";
@@ -29,7 +27,6 @@ const PLACEHOLDER: Record<SourceMode, string> = {
 
 export default function App() {
   const [source, setSource] = useState<SourceMode>("demo");
-  const [renderer, setRenderer] = useState<RendererMode>("ink");
   const [recording, setRecording] = useState(false);
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [lines, setLines] = useState<string[]>([]);
@@ -47,6 +44,11 @@ export default function App() {
   useEffect(() => {
     wearRef.current.add(analysis.arousal);
   }, [analysis]);
+
+  // The canvas reads keywords per frame, so they arrive by ref rather than as a
+  // prop — same reason the analysis does.
+  const keywordsRef = useRef<Keyword[]>(analysis.keywords);
+  keywordsRef.current = analysis.keywords;
 
   const onDemoUpdate = useCallback(
     (next: Analysis, line: string) => {
@@ -123,15 +125,12 @@ export default function App() {
 
   return (
     <div className="app">
-      {renderer === "ink" ? (
-        <InkAura
-          analysisRef={analysisRef}
-          connection={connection}
-          wearRef={wearRef}
-        />
-      ) : (
-        <Aura analysisRef={analysisRef} connection={connection} />
-      )}
+      <HighlighterAura
+        analysisRef={analysisRef}
+        keywordsRef={keywordsRef}
+        connection={connection}
+        wearRef={wearRef}
+      />
       <TranscriptDisplay
         lines={lines}
         interim={interim}
@@ -147,10 +146,6 @@ export default function App() {
         onToggle={toggle}
         onSourceChange={changeSource}
       />
-      <div className="renderer-pick">
-        <span className="label">Style</span>
-        <RendererSwitch renderer={renderer} onChange={setRenderer} />
-      </div>
     </div>
   );
 }

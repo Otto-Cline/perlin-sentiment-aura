@@ -24,9 +24,6 @@ export const NEUTRAL_ANALYSIS: Analysis = {
 
 export type SourceMode = "demo" | "hardcoded" | "live";
 
-/** Which visualization is drawing. Both read the same analysis stream. */
-export type RendererMode = "ink" | "streams";
-
 export type ConnectionState =
   | "idle"
   | "connecting"
